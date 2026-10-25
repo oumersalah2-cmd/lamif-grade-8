@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/exam_repository.dart';
 import '../widgets/exam_progress_widget.dart';
+import '../screens/exam_history_screen.dart';
 
 class ProgressOverviewScreen extends ConsumerWidget {
   const ProgressOverviewScreen({Key? key}) : super(key: key);
@@ -19,6 +20,15 @@ class ProgressOverviewScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Seenaa Qormaataa (Exam History)',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ExamHistoryScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Qindeessi (Sync)',

@@ -7,12 +7,17 @@ import com.example.data.local.entities.QuestionEntity
 import com.example.data.local.entities.SyncQueueEntity
 import com.example.data.local.entities.UserProfileEntity
 import kotlinx.coroutines.Dispatchers
+import android.content.Context
+import com.example.data.sync.ExamSyncManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-class ExamRepository(private val db: AppDatabase) {
+class ExamRepository(
+  private val db: AppDatabase,
+  private val context: Context? = null
+) {
 
   fun getQuestionsForSubject(subjectId: String): Flow<List<QuestionEntity>> =
     db.questionDao().getQuestionsBySubject(subjectId)
@@ -55,6 +60,13 @@ class ExamRepository(private val db: AppDatabase) {
         syncStatus = "PENDING"
       )
       db.syncDao().insertSyncItem(syncItem)
+
+      // 3. Trigger WorkManager one-time sync task with NetworkType.CONNECTED
+      context?.let {
+        try {
+          ExamSyncManager.triggerImmediateSync(it)
+        } catch (_: Exception) {}
+      }
 
       attempt
     }

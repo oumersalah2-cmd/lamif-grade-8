@@ -11,6 +11,8 @@ import '../models/subject_model.dart';
 abstract class IStudyMaterialRepository {
   Future<List<SubjectModel>> getSubjects({bool forceRefresh = false});
   Future<List<StudyMaterialModel>> getMaterialsBySubject(String subjectId, {bool forceRefresh = false});
+  Future<List<StudyMaterialModel>> getAllMaterials();
+  Future<List<StudyMaterialModel>> searchMaterials(String query, {String? subjectId});
   Future<bool> downloadSubjectForOffline(String subjectId);
   Future<void> saveLocalMaterial(StudyMaterialModel material);
 }
@@ -20,6 +22,7 @@ abstract class ILocalStudyStorage {
   Future<List<SubjectModel>> getLocalSubjects();
   Future<void> saveSubjects(List<SubjectModel> subjects);
   Future<List<StudyMaterialModel>> getLocalMaterials(String subjectId);
+  Future<List<StudyMaterialModel>> getAllLocalMaterials();
   Future<void> saveMaterials(List<StudyMaterialModel> materials);
   Future<void> markSubjectDownloaded(String subjectId);
 }
@@ -48,6 +51,15 @@ class LocalStudyStorage implements ILocalStudyStorage {
   @override
   Future<List<StudyMaterialModel>> getLocalMaterials(String subjectId) async {
     return _materialsBySubject[subjectId] ?? [];
+  }
+
+  @override
+  Future<List<StudyMaterialModel>> getAllLocalMaterials() async {
+    final all = <StudyMaterialModel>[];
+    for (final list in _materialsBySubject.values) {
+      all.addAll(list);
+    }
+    return all;
   }
 
   @override
@@ -310,6 +322,29 @@ class StudyMaterialRepository implements IStudyMaterialRepository {
       return true;
     }
     return false;
+  }
+
+  @override
+  Future<List<StudyMaterialModel>> getAllMaterials() async {
+    return await _localStorage.getAllLocalMaterials();
+  }
+
+  @override
+  Future<List<StudyMaterialModel>> searchMaterials(String query, {String? subjectId}) async {
+    final lowerQ = query.trim().toLowerCase();
+    final all = await getAllMaterials();
+    return all.where((m) {
+      if (subjectId != null && subjectId.isNotEmpty && m.subjectId.toLowerCase() != subjectId.toLowerCase()) {
+        return false;
+      }
+      if (lowerQ.isEmpty) return true;
+      final topicMatch = m.topicTitleOm.toLowerCase().contains(lowerQ);
+      final unitMatch = m.unitTitleOm.toLowerCase().contains(lowerQ);
+      final summaryMatch = m.summaryContentOm.toLowerCase().contains(lowerQ);
+      final tipsMatch = m.pastExamTipsOm.toLowerCase().contains(lowerQ);
+      final formulasMatch = m.keyFormulasOrRules.any((f) => f.toLowerCase().contains(lowerQ));
+      return topicMatch || unitMatch || summaryMatch || tipsMatch || formulasMatch;
+    }).toList();
   }
 
   @override

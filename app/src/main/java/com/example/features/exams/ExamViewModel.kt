@@ -40,7 +40,7 @@ data class ExamUiState(
 )
 
 class ExamViewModel(application: Application) : AndroidViewModel(application) {
-  private val repository = ExamRepository(AppDatabase.getDatabase(application))
+  private val repository = ExamRepository(AppDatabase.getDatabase(application), application)
 
   private val _uiState = MutableStateFlow(ExamUiState())
   val uiState: StateFlow<ExamUiState> = _uiState.asStateFlow()

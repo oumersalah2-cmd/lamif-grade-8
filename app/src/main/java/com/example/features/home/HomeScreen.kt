@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -62,6 +63,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.Subject
 import com.example.features.exams.ExamMode
 
+import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.ThemeQuickToggleButton
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -70,6 +74,9 @@ fun HomeScreen(
   onOpenStudyNotes: () -> Unit,
   onOpenProfile: () -> Unit,
   onReviewMistakes: () -> Unit,
+  onOpenSchedule: () -> Unit,
+  themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+  onQuickToggleTheme: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val state by viewModel.uiState.collectAsState()
@@ -111,6 +118,10 @@ fun HomeScreen(
           }
         },
         actions = {
+          ThemeQuickToggleButton(
+            currentMode = themeMode,
+            onToggle = onQuickToggleTheme
+          )
           IconButton(
             onClick = onOpenProfile,
             modifier = Modifier.testTag("profile_button")
@@ -353,6 +364,22 @@ fun HomeScreen(
             color = Color(0xFFDC2626),
             modifier = Modifier.weight(1f),
             onClick = onReviewMistakes
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          QuickActionCard(
+            title = "Sagantaa",
+            subtitle = "Qo'annoo Guyyaa",
+            icon = Icons.Default.CalendarMonth,
+            color = Color(0xFF0D9488),
+            modifier = Modifier.weight(1f),
+            onClick = onOpenSchedule
           )
 
           QuickActionCard(

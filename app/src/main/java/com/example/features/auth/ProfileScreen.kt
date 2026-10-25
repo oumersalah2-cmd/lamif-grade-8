@@ -62,11 +62,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.ThemeSettingCard
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
   viewModel: AuthViewModel,
   onNavigateBack: () -> Unit,
+  themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+  onThemeModeChanged: (AppThemeMode) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val authState by viewModel.state.collectAsState()
@@ -517,7 +522,15 @@ fun ProfileScreen(
         }
       }
 
-      // 4. Offline Storage Info
+      // 4. Bifa Applikeshinii (Theme Setting Card)
+      item {
+        ThemeSettingCard(
+          currentMode = themeMode,
+          onThemeModeSelected = onThemeModeChanged
+        )
+      }
+
+      // 5. Offline Storage Info
       item {
         Card(
           shape = RoundedCornerShape(16.dp),
