@@ -1,0 +1,6 @@
+{
+  "name": "Lamif Kutaa 8 Prep",
+  "description": "Appilikeeshinii Qophii Qormaata Naannoo Kutaa 8ffaa Oromiyaa - Offline-first Grade 8 Ministry Exam preparation in Afaan Oromoo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

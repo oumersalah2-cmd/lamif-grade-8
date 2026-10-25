@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "User": {
+      "path": "/users/{userId}",
+      "description": "Student profile data",
+      "fields": {
+        "fullName": { "type": "string", "required": true },
+        "phoneNumber": { "type": "string", "required": false },
+        "schoolName": { "type": "string", "required": true },
+        "zoneName": { "type": "string", "required": true },
+        "targetScore": { "type": "number", "required": true },
+        "streakDays": { "type": "number", "required": false },
+        "createdAt": { "type": "timestamp", "required": false },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "ExamAttempt": {
+      "path": "/users/{userId}/exam_attempts/{attemptId}",
+      "description": "Student exam attempts and scores",
+      "fields": {
+        "subjectId": { "type": "string", "required": true },
+        "examType": { "type": "string", "required": true },
+        "totalQuestions": { "type": "number", "required": true },
+        "correctAnswersCount": { "type": "number", "required": true },
+        "scorePercentage": { "type": "number", "required": true },
+        "timeTakenSeconds": { "type": "number", "required": true },
+        "timestamp": { "type": "number", "required": false },
+        "createdAt": { "type": "timestamp", "required": false }
+      }
+    }
+  }
+}

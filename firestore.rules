@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 100
+        && data.schoolName is string && data.schoolName.size() > 0 && data.schoolName.size() <= 150
+        && data.zoneName is string && data.zoneName.size() > 0 && data.zoneName.size() <= 100
+        && data.targetScore is number && data.targetScore >= 0 && data.targetScore <= 100;
+    }
+
+    function isValidExamAttempt(data) {
+      return data.subjectId is string && data.subjectId.size() > 0
+        && data.examType is string
+        && data.totalQuestions is number && data.totalQuestions > 0
+        && data.correctAnswersCount is number && data.correctAnswersCount >= 0
+        && data.scorePercentage is number && data.scorePercentage >= 0 && data.scorePercentage <= 100
+        && data.timeTakenSeconds is number && data.timeTakenSeconds >= 0;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow delete: if false;
+
+      match /exam_attempts/{attemptId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExamAttempt(request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
