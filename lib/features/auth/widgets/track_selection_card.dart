@@ -134,16 +134,42 @@ class TrackSelectionCard extends StatelessWidget {
                                 ),
                               ),
                             ],
-                            Text(
-                              track.titleOm,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0F172A), // Slate 900
-                                height: 1.25,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    track.titleOm,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontSize: 16.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF0F172A), // Slate 900
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: primaryAccent.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: primaryAccent.withOpacity(0.25),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    track.priceDisplay,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: primaryAccent,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
                             Text(
                               track.subtitle,
                               style: theme.textTheme.bodySmall?.copyWith(

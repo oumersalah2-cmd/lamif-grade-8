@@ -8,6 +8,7 @@ import 'package:isar/isar.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../models/exam_result_schema.dart';
+import '../models/user_progress_schema.dart';
 import 'exam_isar_service.dart';
 
 /// Unique task identifiers for WorkManager background service
@@ -46,28 +47,37 @@ class SyncExecutionResult {
       'SyncExecutionResult(success: $isSuccess, synced: $syncedRecordsCount, pending: $remainingUnsyncedCount, msg: $messageOm)';
 }
 
-/// Remote Backend API Client for pushing exam results
+/// Remote Backend API Client for pushing exam results and user progress to PostgreSQL via Express
 class ExamSyncApiClient {
   final http.Client _client;
   final String _baseUrl;
 
   ExamSyncApiClient({
     http.Client? client,
-    String baseUrl = 'https://api.lamifkutaa8.et',
+    String? baseUrl,
   })  : _client = client ?? http.Client(),
-        _baseUrl = baseUrl;
+        _baseUrl = baseUrl ?? resolveDefaultBaseUrl();
 
-  /// Sends a batch of unsynced ExamResults to the backend server.
-  /// Expects server to acknowledge saved result IDs.
-  Future<List<Id>> uploadExamResults({
-    required List<ExamResult> results,
+  static String resolveDefaultBaseUrl() {
+    if (kIsWeb) return 'http://localhost:5000';
+    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:5000';
+    return 'http://localhost:5000';
+  }
+
+  /// Sends both unsynced ExamResults and UserProgress records to remote backend
+  Future<Map<String, List<Id>>> syncOfflineBatch({
+    required List<ExamResult> examResults,
+    required List<UserProgress> userProgress,
     String? authToken,
   }) async {
-    if (results.isEmpty) return [];
+    if (examResults.isEmpty && userProgress.isEmpty) {
+      return {'exams': [], 'progress': []};
+    }
 
     final payload = jsonEncode({
       'batchTimestamp': DateTime.now().toIso8601String(),
-      'records': results.map((r) => r.toJson()).toList(),
+      'examResults': examResults.map((r) => r.toJson()).toList(),
+      'userProgress': userProgress.map((p) => p.toJson()).toList(),
     });
 
     final headers = {
@@ -80,22 +90,25 @@ class ExamSyncApiClient {
     try {
       final response = await _client
           .post(
-            Uri.parse('$_baseUrl/api/v1/exams/sync-results'),
+            Uri.parse('$_baseUrl/api/v1/exams/sync'),
             headers: headers,
             body: payload,
           )
           .timeout(const Duration(seconds: 25));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['syncedIds'] is List) {
-          final idList = (decoded['syncedIds'] as List)
-              .map((id) => (id as num).toInt())
-              .toList();
-          return idList;
-        }
-        // If server returns standard success without explicit ID list, all sent items are considered synced
-        return results.map((r) => r.id).toList();
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final syncedExamIds = (decoded['syncedExamIds'] as List? ?? decoded['syncedIds'] as List? ?? [])
+            .map((id) => (id as num).toInt())
+            .toList();
+        final syncedProgressIds = (decoded['syncedProgressIds'] as List? ?? [])
+            .map((id) => (id as num).toInt())
+            .toList();
+
+        return {
+          'exams': syncedExamIds.isNotEmpty ? syncedExamIds : examResults.map((r) => r.id).toList(),
+          'progress': syncedProgressIds.isNotEmpty ? syncedProgressIds : userProgress.map((p) => p.id).toList(),
+        };
       } else {
         throw HttpException(
           'Server rejected sync payload with HTTP ${response.statusCode}: ${response.body}',
@@ -108,6 +121,19 @@ class ExamSyncApiClient {
       debugPrint('[ExamSyncApiClient] Network timeout: ${e.message}');
       rethrow;
     }
+  }
+
+  /// Backward-compatible method: Sends batch of unsynced ExamResults
+  Future<List<Id>> uploadExamResults({
+    required List<ExamResult> results,
+    String? authToken,
+  }) async {
+    final batchRes = await syncOfflineBatch(
+      examResults: results,
+      userProgress: [],
+      authToken: authToken,
+    );
+    return batchRes['exams'] ?? [];
   }
 }
 
@@ -150,13 +176,16 @@ Future<SyncExecutionResult> executeExamSyncEngine({
   final now = DateTime.now();
 
   try {
-    // Step 1: Query local Isar collection for records with isSynced = false
+    // Step 1: Query local Isar collections for records with isSynced = false
     final unsyncedResults = await isarService.getUnsyncedExamResults();
+    final unsyncedProgress = await isarService.getUnsyncedUserProgress();
+    final totalPending = unsyncedResults.length + unsyncedProgress.length;
+
     debugPrint(
-      '[ExamSyncWorker] Found ${unsyncedResults.length} unsynced ExamResult records in Isar',
+      '[ExamSyncWorker] Found ${unsyncedResults.length} unsynced ExamResults and ${unsyncedProgress.length} unsynced UserProgress in Isar',
     );
 
-    if (unsyncedResults.isEmpty) {
+    if (totalPending == 0) {
       return SyncExecutionResult(
         isSuccess: true,
         syncedRecordsCount: 0,
@@ -166,42 +195,48 @@ Future<SyncExecutionResult> executeExamSyncEngine({
       );
     }
 
-    // Step 2: Push pending records to remote backend
-    List<Id> syncedIds;
+    // Step 2: Push pending records to remote Express/PostgreSQL backend
+    Map<String, List<Id>> syncAck;
     try {
-      syncedIds = await apiClient.uploadExamResults(
-        results: unsyncedResults,
+      syncAck = await apiClient.syncOfflineBatch(
+        examResults: unsyncedResults,
+        userProgress: unsyncedProgress,
         authToken: authToken,
       );
     } catch (networkError) {
-      // Fallback: If remote backend is unreachable during demo or offline mode,
-      // verify network availability and propagate status
       debugPrint(
-        '[ExamSyncWorker] Network request encountered error: $networkError. Marking simulated sync for test/demo resilience if offline.',
+        '[ExamSyncWorker] Network request encountered error: $networkError.',
       );
       return SyncExecutionResult(
         isSuccess: false,
         syncedRecordsCount: 0,
-        remainingUnsyncedCount: unsyncedResults.length,
-        messageOm: 'Dogoggora netwoorkii: Qabxiin duumessatti hin ergamne. Yeroo netwoorkiin deebi\'u ofumaan yaalama.',
+        remainingUnsyncedCount: totalPending,
+        messageOm: 'Dogoggora netwoorkii: Qabxiin duumessatti hin ergamne. Yeroo intarneetiin deebi\'u ofumaan yaalama.',
         timestamp: now,
       );
     }
 
     // Step 3: Mark acknowledged records as isSynced = true in Isar
     int successfullyMarked = 0;
-    for (final id in syncedIds) {
+    final syncedExamIds = syncAck['exams'] ?? [];
+    for (final id in syncedExamIds) {
       await isarService.markExamResultSynced(id);
       successfullyMarked++;
     }
 
-    final remaining = unsyncedResults.length - successfullyMarked;
+    final syncedProgressIds = syncAck['progress'] ?? [];
+    for (final id in syncedProgressIds) {
+      await isarService.markUserProgressSynced(id);
+      successfullyMarked++;
+    }
+
+    final remaining = totalPending - successfullyMarked;
 
     return SyncExecutionResult(
       isSuccess: true,
       syncedRecordsCount: successfullyMarked,
       remainingUnsyncedCount: remaining,
-      messageOm: 'Qabxiin qormaataa $successfullyMarked milkaa\'inaan duumessatti qindaa\'eera!',
+      messageOm: 'Galmeen $successfullyMarked (qormaata fi sochii) milkaa\'inaan duumessatti qindaa\'eera!',
       timestamp: now,
     );
   } catch (e, stack) {
@@ -403,4 +438,18 @@ final unsyncedExamResultsCountProvider = FutureProvider<int>((ref) async {
   final isarService = ref.watch(examIsarServiceProvider);
   final unsynced = await isarService.getUnsyncedExamResults();
   return unsynced.length;
+});
+
+/// Future provider to count how many UserProgress records currently have isSynced = false
+final unsyncedUserProgressCountProvider = FutureProvider<int>((ref) async {
+  final isarService = ref.watch(examIsarServiceProvider);
+  final unsynced = await isarService.getUnsyncedUserProgress();
+  return unsynced.length;
+});
+
+/// Future provider to count total records waiting for background sync
+final totalUnsyncedRecordsCountProvider = FutureProvider<int>((ref) async {
+  final exams = await ref.watch(unsyncedExamResultsCountProvider.future);
+  final progress = await ref.watch(unsyncedUserProgressCountProvider.future);
+  return exams + progress;
 });

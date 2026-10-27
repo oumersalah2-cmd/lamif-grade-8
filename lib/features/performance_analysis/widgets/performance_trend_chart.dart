@@ -28,14 +28,14 @@ class _PerformanceTrendChartState extends State<PerformanceTrendChart> {
     if (widget.points.isEmpty) {
       return Container(
         height: widget.height,
-        alignment: Alignment.Center,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
-          mainAxisAlignment: MainContent.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: const [
             Icon(Icons.show_chart_rounded, size: 44, color: Color(0xFF94A3B8)),
             SizedBox(height: 10),
@@ -81,7 +81,7 @@ class _PerformanceTrendChartState extends State<PerformanceTrendChart> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
-              mainAxisAlignment: MainContent.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -555,7 +555,9 @@ class ExamHistoryScreen extends ConsumerWidget {
           const SizedBox(height: 6),
           // Short date label (MM/dd)
           Text(
-            '${result.dateTaken.month}/${result.dateTaken.day}',
+            result.dateTaken != null
+                ? '${result.dateTaken!.month}/${result.dateTaken!.day}'
+                : '--/--',
             style: TextStyle(
               fontSize: 9,
               fontWeight: isLatest ? FontWeight.bold : FontWeight.normal,

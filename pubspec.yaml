@@ -1,0 +1,53 @@
+name: lamif_grade_8
+description: "Appilikeeshinii Qophii Qormaata Naannoo Kutaa 8ffaa Oromiyaa - Offline-first Grade 8 Ministry Exam preparation in Afaan Oromoo."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management & DI
+  flutter_riverpod: ^2.5.1
+
+  # Navigation & Routing
+  go_router: ^14.0.0
+
+  # Local Offline Database
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  path_provider: ^2.1.2
+
+  # Key-Value Persistence
+  shared_preferences: ^2.2.3
+
+  # Network & REST APIs
+  http: ^1.2.1
+
+  # Background Workers & Sync
+  workmanager: ^0.5.2
+
+  # Authentication
+  firebase_core: ^2.30.0
+  firebase_auth: ^4.19.0
+
+  # Icons & Formatting
+  cupertino_icons: ^1.0.6
+  intl: ^0.19.0
+
+  # Media & File Upload
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.9
+
+flutter:
+  uses-material-design: true

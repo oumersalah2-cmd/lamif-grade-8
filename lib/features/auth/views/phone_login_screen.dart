@@ -235,7 +235,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                   backgroundColor: const Color(0xFF1B6E32),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedCornerShape(12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: isLoading
                     ? const SizedBox(
@@ -269,7 +269,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   side: const BorderSide(color: Color(0xFFD97706), width: 1.5),
-                  shape: RoundedCornerShape(12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],

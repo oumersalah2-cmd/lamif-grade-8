@@ -1,0 +1,23 @@
+{
+  "name": "lamif-grade-8-backend",
+  "version": "1.0.0",
+  "description": "Express Backend for Lamif Kutaa 8 Prep - PostgreSQL via Prisma, Multer Receipt Processing & Offline Sync",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0"
+  }
+}

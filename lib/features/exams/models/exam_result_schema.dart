@@ -18,7 +18,7 @@ class ExamResult {
   late int timeTaken; // Duration in seconds
 
   @Index()
-  late DateTime dateTaken;
+  DateTime? dateTaken;
 
   /// Critical flag for offline-first synchronization engine
   /// Must strictly default to false until pushed to backend
@@ -31,9 +31,9 @@ class ExamResult {
     this.score = 0,
     this.totalQuestions = 0,
     this.timeTaken = 0,
-    DateTime? dateTaken,
+    this.dateTaken,
     this.isSynced = false,
-  }) : dateTaken = dateTaken ?? DateTime.now();
+  });
 
   /// Calculates percentage score (0.0 to 100.0)
   double get scorePercentage =>
@@ -60,11 +60,12 @@ class ExamResult {
 
   /// Formatted date string (e.g., "2026-02-24 14:30")
   String get formattedDate {
-    final year = dateTaken.year;
-    final month = dateTaken.month.toString().padLeft(2, '0');
-    final day = dateTaken.day.toString().padLeft(2, '0');
-    final hour = dateTaken.hour.toString().padLeft(2, '0');
-    final minute = dateTaken.minute.toString().padLeft(2, '0');
+    final dt = dateTaken ?? DateTime.now();
+    final year = dt.year;
+    final month = dt.month.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
     return '$year-$month-$day $hour:$minute';
   }
 
@@ -116,7 +117,7 @@ class ExamResult {
       'score': score,
       'totalQuestions': totalQuestions,
       'timeTaken': timeTaken,
-      'dateTaken': dateTaken.toIso8601String(),
+      'dateTaken': (dateTaken ?? DateTime.now()).toIso8601String(),
       'isSynced': isSynced,
     };
   }

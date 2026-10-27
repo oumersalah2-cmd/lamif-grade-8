@@ -54,7 +54,7 @@ class PerformanceAnalysisScreen extends ConsumerWidget {
             children: [
               // 1. Time Range Selector & Title
               Row(
-                mainAxisAlignment: MainContent.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +83,7 @@ class PerformanceAnalysisScreen extends ConsumerWidget {
                     ),
                     padding: const EdgeInsets.all(3),
                     child: Row(
-                      mainAxisSize: MainContent.min,
+                      mainAxisSize: MainAxisSize.min,
                       children: TimeRangeFilter.values.map((range) {
                         final isSelected = state.timeRange == range;
                         return GestureDetector(
@@ -200,7 +200,7 @@ class PerformanceAnalysisScreen extends ConsumerWidget {
                         ),
                         backgroundColor: Colors.white,
                         selectedColor: const Color(0xFF0D47A1),
-                        shape: RoundedCornerShape(12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         side: BorderSide(
                           color: isSelected ? const Color(0xFF0D47A1) : const Color(0xFFE2E8F0),
                         ),

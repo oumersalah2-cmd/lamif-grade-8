@@ -41,7 +41,7 @@ class MetricStatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainContent.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -61,7 +61,7 @@ class MetricStatCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
-                    mainAxisSize: MainContent.min,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         (isPositiveTrend ?? true)

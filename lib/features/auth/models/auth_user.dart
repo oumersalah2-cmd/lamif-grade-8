@@ -1,3 +1,6 @@
+import 'payment_status.dart';
+import 'student_track.dart';
+
 class AuthUser {
   final String uid;
   final String phoneNumber;
@@ -5,7 +8,11 @@ class AuthUser {
   final String? schoolName;
   final String? zoneName;
   final String? backendToken;
-  final bool isVerified;
+  final bool isVerified; // Phone verification
+  final PaymentStatus paymentStatus; // Payment verification status (PENDING, VERIFIED, REJECTED)
+  final StudentTrack? selectedTrack;
+  final String? paymentReceiptUrl;
+  final double? amountPaid;
   final DateTime? createdAt;
 
   const AuthUser({
@@ -16,19 +23,34 @@ class AuthUser {
     this.zoneName,
     this.backendToken,
     this.isVerified = false,
+    this.paymentStatus = PaymentStatus.pending,
+    this.selectedTrack,
+    this.paymentReceiptUrl,
+    this.amountPaid,
     this.createdAt,
   });
 
+  /// True if student has been fully verified and paid
+  bool get hasPaidAccess => paymentStatus == PaymentStatus.verified;
+
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
-      uid: json['uid'] as String,
-      phoneNumber: json['phoneNumber'] as String,
-      fullName: json['fullName'] as String?,
+      uid: json['uid'] as String? ?? json['userId'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? json['phone'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? json['name'] as String?,
       schoolName: json['schoolName'] as String?,
-      zoneName: json['zoneName'] as String?,
+      zoneName: json['zoneName'] as String? ?? json['schoolZone'] as String?,
       backendToken: json['token'] as String? ?? json['backendToken'] as String?,
       isVerified: json['isVerified'] as bool? ?? true,
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'] as String) : null,
+      paymentStatus: PaymentStatus.fromString(json['paymentStatus'] as String?),
+      selectedTrack: json['selectedTrack'] != null
+          ? StudentTrack.fromStorageValue(json['selectedTrack'] as String?)
+          : null,
+      paymentReceiptUrl: json['paymentReceiptUrl'] as String?,
+      amountPaid: (json['amountPaid'] as num?)?.toDouble(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
     );
   }
 
@@ -41,6 +63,10 @@ class AuthUser {
       'zoneName': zoneName,
       'backendToken': backendToken,
       'isVerified': isVerified,
+      'paymentStatus': paymentStatus.prismaValue,
+      'selectedTrack': selectedTrack?.storageValue,
+      'paymentReceiptUrl': paymentReceiptUrl,
+      'amountPaid': amountPaid,
       'createdAt': createdAt?.toIso8601String(),
     };
   }
@@ -53,6 +79,10 @@ class AuthUser {
     String? zoneName,
     String? backendToken,
     bool? isVerified,
+    PaymentStatus? paymentStatus,
+    StudentTrack? selectedTrack,
+    String? paymentReceiptUrl,
+    double? amountPaid,
     DateTime? createdAt,
   }) {
     return AuthUser(
@@ -63,6 +93,10 @@ class AuthUser {
       zoneName: zoneName ?? this.zoneName,
       backendToken: backendToken ?? this.backendToken,
       isVerified: isVerified ?? this.isVerified,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      selectedTrack: selectedTrack ?? this.selectedTrack,
+      paymentReceiptUrl: paymentReceiptUrl ?? this.paymentReceiptUrl,
+      amountPaid: amountPaid ?? this.amountPaid,
       createdAt: createdAt ?? this.createdAt,
     );
   }

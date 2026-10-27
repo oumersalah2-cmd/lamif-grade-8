@@ -22,6 +22,7 @@ export 'screens/exam_screen.dart';
 export 'screens/exam_history_screen.dart';
 export 'views/exam_screen.dart';
 export 'views/exam_history_screen.dart';
+export 'views/exam_catalog_screen.dart';
 export 'views/progress_overview_screen.dart';
 export 'widgets/exam_progress_widget.dart';
 export 'widgets/exam_timer_badge.dart';

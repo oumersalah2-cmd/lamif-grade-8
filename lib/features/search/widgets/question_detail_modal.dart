@@ -223,7 +223,7 @@ class QuestionDetailModal extends StatelessWidget {
                 backgroundColor: const Color(0xFF0D47A1),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedCornerShape(12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text(
                 'Cufi (Close)',

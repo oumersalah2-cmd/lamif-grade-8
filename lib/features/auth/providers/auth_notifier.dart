@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
+import '../models/payment_status.dart';
 import '../models/student_track.dart';
 import '../services/auth_service.dart';
 import 'auth_state.dart';
@@ -16,6 +18,9 @@ class AuthStorageKeys {
   static const String userSchoolName = 'auth_user_school_name';
   static const String userZoneName = 'auth_user_zone_name';
   static const String isGuest = 'auth_is_guest';
+  static const String paymentStatus = 'auth_payment_status';
+  static const String paymentReceiptUrl = 'auth_payment_receipt_url';
+  static const String amountPaid = 'auth_amount_paid';
 }
 
 /// Provider for the AuthService interface
@@ -74,6 +79,18 @@ final shouldShowMinistryProvider = Provider<bool>((ref) {
   return track == StudentTrack.ministryOnly || track == StudentTrack.both;
 });
 
+/// Exposes the student's payment verification status (PENDING, VERIFIED, REJECTED)
+final paymentStatusProvider = Provider<PaymentStatus>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.paymentStatus ?? PaymentStatus.pending;
+});
+
+/// Convenience provider: true only when payment has been reviewed & verified by backend
+final isPaymentVerifiedProvider = Provider<bool>((ref) {
+  final status = ref.watch(paymentStatusProvider);
+  return status == PaymentStatus.verified;
+});
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final IAuthService _authService;
 
@@ -88,6 +105,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final isOnboarded = prefs.getBool(AuthStorageKeys.isOnboarded) ?? false;
       final savedTrackStr = prefs.getString(AuthStorageKeys.studentTrack);
       final savedTrack = StudentTrack.fromStorageValue(savedTrackStr);
+      final savedPaymentStatus = PaymentStatus.fromString(prefs.getString(AuthStorageKeys.paymentStatus));
+      final savedReceiptUrl = prefs.getString(AuthStorageKeys.paymentReceiptUrl);
+      final savedAmount = prefs.getDouble(AuthStorageKeys.amountPaid);
 
       final isGuestSession = prefs.getBool(AuthStorageKeys.isGuest) ?? false;
       if (isGuestSession && isOnboarded) {
@@ -98,6 +118,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           schoolName: prefs.getString(AuthStorageKeys.userSchoolName),
           zoneName: prefs.getString(AuthStorageKeys.userZoneName) ?? 'Oromiyaa',
           isVerified: false,
+          paymentStatus: savedPaymentStatus,
+          selectedTrack: savedTrack,
+          paymentReceiptUrl: savedReceiptUrl,
+          amountPaid: savedAmount,
         );
         state = AuthenticatedState(
           user: guestUser,
@@ -116,6 +140,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             fullName: prefs.getString(AuthStorageKeys.userFullName) ?? firebaseUser.fullName,
             schoolName: prefs.getString(AuthStorageKeys.userSchoolName) ?? firebaseUser.schoolName,
             zoneName: prefs.getString(AuthStorageKeys.userZoneName) ?? firebaseUser.zoneName,
+            paymentStatus: savedPaymentStatus,
+            selectedTrack: savedTrack,
+            paymentReceiptUrl: savedReceiptUrl,
+            amountPaid: savedAmount,
           );
           state = AuthenticatedState(
             user: enrichedUser,
@@ -303,6 +331,80 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessageOm: "Galmeen sagantaa hin milkoofne. Irra deebi'aa yaalaa.",
         technicalError: e.toString(),
       );
+    }
+  }
+
+  /// Record submitted payment receipt with PENDING status
+  Future<void> recordPaymentSubmitted({
+    required StudentTrack track,
+    required String fullName,
+    required String schoolName,
+    required String zoneName,
+    String? receiptUrl,
+    double? amountPaid,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AuthStorageKeys.studentTrack, track.storageValue);
+      await prefs.setBool(AuthStorageKeys.isOnboarded, true);
+      await prefs.setString(AuthStorageKeys.userFullName, fullName.trim());
+      await prefs.setString(AuthStorageKeys.userSchoolName, schoolName.trim());
+      await prefs.setString(AuthStorageKeys.userZoneName, zoneName.trim());
+      await prefs.setString(AuthStorageKeys.paymentStatus, PaymentStatus.pending.prismaValue);
+      if (receiptUrl != null) {
+        await prefs.setString(AuthStorageKeys.paymentReceiptUrl, receiptUrl);
+      }
+      if (amountPaid != null) {
+        await prefs.setDouble(AuthStorageKeys.amountPaid, amountPaid);
+      }
+
+      String uid = prefs.getString(AuthStorageKeys.userUid) ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+      String phone = prefs.getString(AuthStorageKeys.userPhone) ?? '+251';
+
+      if (state is OtpVerifiedState) {
+        final verifiedState = state as OtpVerifiedState;
+        uid = verifiedState.uid;
+        phone = verifiedState.phoneNumber;
+      } else if (state is AuthenticatedState) {
+        final authState = state as AuthenticatedState;
+        uid = authState.user.uid;
+        phone = authState.user.phoneNumber;
+      }
+
+      final updatedUser = AuthUser(
+        uid: uid,
+        phoneNumber: phone,
+        fullName: fullName.trim(),
+        schoolName: schoolName.trim(),
+        zoneName: zoneName.trim(),
+        isVerified: true,
+        paymentStatus: PaymentStatus.pending,
+        selectedTrack: track,
+        paymentReceiptUrl: receiptUrl,
+        amountPaid: amountPaid,
+        createdAt: DateTime.now(),
+      );
+
+      state = AuthenticatedState(
+        user: updatedUser,
+        track: track,
+        isOfflineSession: false,
+        isOnboarded: true,
+      );
+    } catch (e) {
+      debugPrint('Error recording payment: $e');
+    }
+  }
+
+  /// Update payment verification status (e.g. from PENDING to VERIFIED)
+  Future<void> updatePaymentStatus(PaymentStatus newStatus) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AuthStorageKeys.paymentStatus, newStatus.prismaValue);
+
+    final currentState = state;
+    if (currentState is AuthenticatedState) {
+      final updatedUser = currentState.user.copyWith(paymentStatus: newStatus);
+      state = currentState.copyWith(user: updatedUser);
     }
   }
 

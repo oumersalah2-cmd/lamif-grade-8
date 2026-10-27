@@ -318,7 +318,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     elevation: 0,
-                    shape: RoundedCornerShape(14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: isLoading
                       ? const SizedBox(
@@ -330,7 +330,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
                           ),
                         )
                       : Row(
-                          mainAxisAlignment: MainContent.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
                             Text(
                               'Koodii Ergi',
@@ -408,7 +408,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     elevation: 0,
-                    shape: RoundedCornerShape(14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: isLoading
                       ? const SizedBox(
@@ -433,7 +433,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
 
                 // Resend OTP / Change Phone row
                 Row(
-                  mainAxisAlignment: MainContent.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton.icon(
                       onPressed: () {
@@ -507,7 +507,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   side: const BorderSide(color: Color(0xFFFBBF24), width: 1.4),
-                  shape: RoundedCornerShape(14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   backgroundColor: const Color(0xFFFFFBEB),
                 ),
               ),
@@ -517,7 +517,7 @@ class _PhoneAuthScreenState extends ConsumerState<PhoneAuthScreen> {
               // Academic Trust Footer
               Center(
                 child: Row(
-                  mainAxisSize: MainContent.min,
+                  mainAxisSize: MainAxisSize.min,
                   children: const [
                     Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF64748B)),
                     SizedBox(width: 6),

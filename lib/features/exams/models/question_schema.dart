@@ -57,8 +57,8 @@ class Question {
     this.text = '',
     this.subjectId = '',
     this.explanation = '',
-    List<Option>? options,
-  }) : options = options ?? [];
+    this.options = const [],
+  });
 
   /// Factory helper to build from basic question parameters
   factory Question.create({

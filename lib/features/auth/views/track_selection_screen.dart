@@ -95,15 +95,25 @@ class _TrackSelectionScreenState extends ConsumerState<TrackSelectionScreen> {
         ? _schoolController.text.trim()
         : 'Mana Barumsaa Sad. 1ffaa';
 
-    await ref.read(authNotifierProvider.notifier).saveProfileAndTrack(
-          fullName: fullName,
-          schoolName: schoolName,
-          zoneName: _selectedZone,
-          track: _selectedTrack,
-        );
+    final authState = ref.read(authNotifierProvider);
+    String phone = '+251911000000';
+    if (authState is OtpVerifiedState) {
+      phone = authState.phoneNumber;
+    } else if (authState is AuthenticatedState) {
+      phone = authState.user.phoneNumber;
+    }
 
     if (mounted) {
-      context.go('/dashboard');
+      context.push(
+        '/payment-verification',
+        extra: {
+          'track': _selectedTrack,
+          'name': fullName,
+          'phone': phone,
+          'zone': _selectedZone,
+          'school': schoolName,
+        },
+      );
     }
   }
 
@@ -417,7 +427,7 @@ class _TrackSelectionScreenState extends ConsumerState<TrackSelectionScreen> {
                   backgroundColor: const Color(0xFF0D47A1), // Trustworthy Academic Blue
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedCornerShape(14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
                 child: isLoading
@@ -427,18 +437,18 @@ class _TrackSelectionScreenState extends ConsumerState<TrackSelectionScreen> {
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2),
                       )
                     : Row(
-                        mainAxisAlignment: MainContent.center,
-                        children: const [
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                           Text(
-                            'Xumuri & Gara Fuulduraatti',
-                            style: TextStyle(
+                            'Itti Fufi: Gara Kaffaltiitti (${_selectedTrack.priceDisplay})',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.2,
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward_rounded, size: 20),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, size: 20),
                         ],
                       ),
               ),

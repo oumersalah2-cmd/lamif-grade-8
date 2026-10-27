@@ -43,7 +43,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   Widget build(BuildContext context) {
     final examState = ref.watch(examNotifierProvider(_params));
     final examNotifier = ref.read(examNotifierProvider(_params).notifier);
-    final theme = MaterialTheme.of(context);
+    final theme = Theme.of(context);
 
     // If exam is completed, show the result view
     if (examState.status == ExamStatus.completed &&

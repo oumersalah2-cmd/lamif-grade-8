@@ -160,7 +160,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   backgroundColor: const Color(0xFF1B6E32),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedCornerShape(12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: isLoading
                     ? const SizedBox(

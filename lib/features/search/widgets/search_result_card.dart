@@ -53,7 +53,7 @@ class SearchResultCard extends StatelessWidget {
                         border: Border.all(color: item.categoryColor.withOpacity(0.2)),
                       ),
                       child: Row(
-                        mainAxisSize: MainContent.min,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(item.icon, size: 12, color: item.categoryColor),
                           const SizedBox(width: 4),

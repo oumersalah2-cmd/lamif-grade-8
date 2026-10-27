@@ -597,7 +597,7 @@ class ExamProgressWidget extends ConsumerWidget {
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: const Size(0, 36),
-              shape: RoundedCornerShape(10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text(
               'Shaakali',

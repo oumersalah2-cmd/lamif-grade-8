@@ -144,10 +144,11 @@ class PerformanceAnalysisNotifier extends StateNotifier<PerformanceAnalysisState
     final cutoff = state.timeRange.cutoffDate;
     var filtered = cutoff == null
         ? List<ExamResult>.from(rawResults)
-        : rawResults.where((r) => r.dateTaken.isAfter(cutoff)).toList();
+        : rawResults.where((r) => r.dateTaken != null && r.dateTaken!.isAfter(cutoff)).toList();
 
     // 2. Sort chronologically (oldest to newest for trend line drawing)
-    filtered.sort((a, b) => a.dateTaken.compareTo(b.dateTaken));
+    filtered.sort((a, b) => (a.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0))
+        .compareTo(b.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0)));
 
     // 3. Compute subject-wise breakdown metrics
     final Map<String, List<ExamResult>> subjectMap = {};
@@ -213,7 +214,7 @@ class PerformanceAnalysisNotifier extends StateNotifier<PerformanceAnalysisState
         id: r.id,
         subjectId: r.subjectId,
         subjectNameOm: mapSubjectIdToTitleOm(r.subjectId),
-        dateTaken: r.dateTaken,
+        dateTaken: r.dateTaken ?? DateTime.now(),
         scorePercentage: r.scorePercentage,
         rawScore: r.score,
         totalQuestions: r.totalQuestions,

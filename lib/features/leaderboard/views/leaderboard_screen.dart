@@ -170,7 +170,7 @@ class LeaderboardScreen extends ConsumerWidget {
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
-          alignment: Alignment.Center,
+          alignment: Alignment.center,
           child: Text(
             label,
             style: TextStyle(

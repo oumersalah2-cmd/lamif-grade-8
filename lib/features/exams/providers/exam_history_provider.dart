@@ -150,10 +150,12 @@ final filteredExamResultsProvider = Provider<List<ExamResult>>((ref) {
   // 2. Sort results
   switch (filter.sortOrder) {
     case ExamSortOrder.newestFirst:
-      list.sort((a, b) => b.dateTaken.compareTo(a.dateTaken));
+      list.sort((a, b) => (b.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(a.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0)));
       break;
     case ExamSortOrder.oldestFirst:
-      list.sort((a, b) => a.dateTaken.compareTo(b.dateTaken));
+      list.sort((a, b) => (a.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(b.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0)));
       break;
     case ExamSortOrder.highestScore:
       list.sort((a, b) => b.scorePercentage.compareTo(a.scorePercentage));
@@ -200,7 +202,8 @@ final examImprovementStatsProvider = Provider<ExamImprovementStats>((ref) {
   // Compute Improvement Trend (earlier tests vs recent tests)
   // Sort chronologically (oldest first)
   final chronological = List<ExamResult>.from(relevantResults)
-    ..sort((a, b) => a.dateTaken.compareTo(b.dateTaken));
+    ..sort((a, b) => (a.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0))
+        .compareTo(b.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0)));
 
   double improvementDelta = 0.0;
   bool isImproving = false;
@@ -242,7 +245,8 @@ final examImprovementStatsProvider = Provider<ExamImprovementStats>((ref) {
 
   final Map<String, SubjectPerformanceSummary> subjectSummaries = {};
   bySubject.forEach((subId, list) {
-    list.sort((a, b) => a.dateTaken.compareTo(b.dateTaken));
+    list.sort((a, b) => (a.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0))
+        .compareTo(b.dateTaken ?? DateTime.fromMillisecondsSinceEpoch(0)));
     final subScores = list.map((e) => e.scorePercentage).toList();
     final subAvg = subScores.reduce((a, b) => a + b) / subScores.length;
     final subHighest = subScores.reduce((a, b) => a > b ? a : b);

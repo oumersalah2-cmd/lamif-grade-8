@@ -65,7 +65,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Sagantaa fiduun hin danda'amne: $e',
+        errorMessage: "Sagantaa fiduun hin danda'amne: $e",
       );
     }
   }

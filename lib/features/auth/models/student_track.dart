@@ -35,6 +35,36 @@ enum StudentTrack {
     }
   }
 
+  /// Price in Ethiopian Birr (ETB)
+  int get priceEtb {
+    switch (this) {
+      case StudentTrack.ministryOnly:
+        return 200;
+      case StudentTrack.ifaBoruOnly:
+        return 200;
+      case StudentTrack.both:
+        return 300;
+    }
+  }
+
+  /// Price display string
+  String get priceDisplay => '$priceEtb ETB';
+
+  /// Exact title with price formatted for UI
+  String get titleWithPrice => '$titleOm ($priceDisplay)';
+
+  /// Maps to remote PostgreSQL / Prisma enum
+  String get prismaValue {
+    switch (this) {
+      case StudentTrack.ministryOnly:
+        return 'MINISTRY_ONLY';
+      case StudentTrack.ifaBoruOnly:
+        return 'IFA_BORU_ONLY';
+      case StudentTrack.both:
+        return 'BOTH';
+    }
+  }
+
   /// Detailed description in Afaan Oromoo for student guidance
   String get descriptionOm {
     switch (this) {

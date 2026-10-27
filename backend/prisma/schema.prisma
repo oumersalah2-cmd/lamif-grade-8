@@ -1,0 +1,84 @@
+// Prisma Schema for "Lamif Kutaa 8 Prep"
+// Dual-Database Architecture: Remote PostgreSQL on Supabase/Neon + Local Isar in Flutter
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Academic preparation track selected by Grade 8 students in Oromia
+enum SelectedTrack {
+  MINISTRY_ONLY  // Qormaata Ministeeraa Qofa (200 ETB)
+  IFA_BORU_ONLY  // Qormaata Ifa Boruu Qofa (200 ETB)
+  BOTH           // Lachuu (300 ETB)
+}
+
+/// Verification status for student registration payment
+enum PaymentStatus {
+  PENDING   // Receipt submitted, awaiting admin review
+  VERIFIED  // Payment verified, full exam & study content unlocked
+  REJECTED  // Receipt rejected (blurry, fake, or invalid transaction)
+}
+
+/// Grade 8 Student profile & credentials
+model User {
+  id                String         @id @default(uuid())
+  name              String
+  phone             String         @unique
+  schoolZone        String         // 21 Oromia Administrative Zones (e.g., Shawaa Bahaa)
+  schoolName        String?        // Name of primary school
+  selectedTrack     SelectedTrack
+  paymentStatus     PaymentStatus  @default(PENDING)
+  paymentReceiptUrl String?        // URL/path to Telebirr or CBE bank receipt screenshot
+  amountPaid        Float?         // 200.0 or 300.0 ETB
+  rejectionReason   String?        // Optional reason if payment is rejected
+  verifiedAt        DateTime?      // Timestamp when admin verified payment
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Dual-Database Offline-First Sync Relations
+  examResults       ExamResult[]
+  userProgress      UserProgress[]
+
+  @@index([phone])
+  @@index([paymentStatus])
+  @@index([selectedTrack])
+}
+
+/// Exam attempt record synced from local Isar database
+model ExamResult {
+  id             String    @id @default(uuid())
+  localId        Int?      // Isar autoIncrement ID on mobile device
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId      String    // Herrega, Afaan Oromoo, Saayinsii Waliigalaa, etc.
+  score          Int       // Number of correct answers
+  totalQuestions Int       // Total questions in exam
+  timeTaken      Int       // Duration in seconds
+  dateTaken      DateTime  // When exam was completed offline
+  syncedAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([dateTaken])
+}
+
+/// Subject & topic progress synced from local Isar database
+model UserProgress {
+  id                     String    @id @default(uuid())
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId              String
+  totalQuestionsAttempted Int       @default(0)
+  totalCorrectAnswers    Int       @default(0)
+  totalTimeSpentSeconds  Int       @default(0)
+  lastStudiedAt          DateTime  @default(now())
+  syncedAt               DateTime  @default(now())
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+}

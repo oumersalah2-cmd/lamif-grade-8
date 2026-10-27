@@ -80,10 +80,10 @@ class AppHighContrastTheme {
       outline: Color(0xFFCBD5E1),
     ),
     scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 1,
-      shape: RoundedCornerShape(18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
   );
 
@@ -109,10 +109,10 @@ class AppHighContrastTheme {
       outline: Color(0xFF334155),
     ),
     scaffoldBackgroundColor: const Color(0xFF090D12),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: const Color(0xFF131923),
       elevation: 2,
-      shape: RoundedCornerShape(18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
   );
 }

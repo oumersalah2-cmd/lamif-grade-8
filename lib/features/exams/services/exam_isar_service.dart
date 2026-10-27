@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import '../models/question_schema.dart';
 import '../models/exam_result_schema.dart';
+import '../models/user_progress_schema.dart';
 
 /// Abstract service defining Isar database interactions for offline exams
 abstract class IExamIsarService {
@@ -10,12 +11,21 @@ abstract class IExamIsarService {
   Future<List<Question>> getAllQuestions();
   Future<List<Question>> searchQuestions(String query, {String? subjectId});
   Future<void> saveQuestions(List<Question> questions);
+  
+  // ExamResult operations with offline-first isSynced flag
   Future<Id> saveExamResult(ExamResult result);
   Future<List<ExamResult>> getAllExamResults();
   Future<List<ExamResult>> getResultsBySubject(String subjectId);
   Future<List<ExamResult>> getUnsyncedExamResults();
   Future<void> markExamResultSynced(Id resultId);
   Stream<List<ExamResult>> watchExamResults();
+
+  // UserProgress operations with offline-first isSynced flag
+  Future<Id> saveUserProgress(UserProgress progress);
+  Future<List<UserProgress>> getAllUserProgress();
+  Future<UserProgress?> getUserProgressBySubject(String subjectId);
+  Future<List<UserProgress>> getUnsyncedUserProgress();
+  Future<void> markUserProgressSynced(Id progressId);
 }
 
 /// Robust offline Isar implementation with persistent caching and seeds
@@ -23,19 +33,22 @@ class ExamIsarService implements IExamIsarService {
   final Isar? _isar;
   final Map<String, List<Question>> _fallbackQuestionCache = {};
   final List<ExamResult> _fallbackResultsCache = [];
+  final List<UserProgress> _fallbackProgressCache = [];
   final StreamController<List<ExamResult>> _resultsStreamController =
       StreamController<List<ExamResult>>.broadcast();
 
   ExamIsarService([this._isar]) {
     _seedDefaultGrade8Questions();
     _seedSampleExamResultsIfEmpty();
+    _seedSampleUserProgressIfEmpty();
   }
 
   @override
   Future<List<Question>> getAllQuestions() async {
-    if (_isar != null && _isar.isOpen) {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
       try {
-        final all = await _isar.questions.where().findAll();
+        final all = await isar.questions.where().findAll();
         if (all.isNotEmpty) return all;
       } catch (_) {}
     }
@@ -64,9 +77,10 @@ class ExamIsarService implements IExamIsarService {
 
   @override
   Future<List<Question>> getQuestionsBySubject(String subjectId) async {
-    if (_isar != null && _isar.isOpen) {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
       try {
-        final results = await _isar.questions
+        final results = await isar.questions
             .filter()
             .subjectIdEqualTo(subjectId)
             .findAll();
@@ -80,9 +94,10 @@ class ExamIsarService implements IExamIsarService {
 
   @override
   Future<void> saveQuestions(List<Question> questions) async {
-    if (_isar != null && _isar.isOpen) {
-      await _isar.writeTxn(() async {
-        await _isar.questions.putAll(questions);
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      await isar.writeTxn(() async {
+        await isar.questions.putAll(questions);
       });
     }
 
@@ -99,10 +114,11 @@ class ExamIsarService implements IExamIsarService {
     // Ensure critical offline-first flag is preserved
     result.isSynced = false;
 
-    if (_isar != null && _isar.isOpen) {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
       Id insertedId = 0;
-      await _isar.writeTxn(() async {
-        insertedId = await _isar.examResults.put(result);
+      await isar.writeTxn(() async {
+        insertedId = await isar.examResults.put(result);
       });
       _notifyResultsChanged();
       return insertedId;
@@ -119,16 +135,18 @@ class ExamIsarService implements IExamIsarService {
 
   @override
   Future<List<ExamResult>> getAllExamResults() async {
-    if (_isar != null && _isar.isOpen) {
-      return await _isar.examResults.where().sortByDateTakenDesc().findAll();
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.examResults.where().sortByDateTakenDesc().findAll();
     }
     return List<ExamResult>.from(_fallbackResultsCache);
   }
 
   @override
   Future<List<ExamResult>> getResultsBySubject(String subjectId) async {
-    if (_isar != null && _isar.isOpen) {
-      return await _isar.examResults
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.examResults
           .filter()
           .subjectIdEqualTo(subjectId)
           .sortByDateTakenDesc()
@@ -141,8 +159,9 @@ class ExamIsarService implements IExamIsarService {
 
   @override
   Future<List<ExamResult>> getUnsyncedExamResults() async {
-    if (_isar != null && _isar.isOpen) {
-      return await _isar.examResults
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.examResults
           .filter()
           .isSyncedEqualTo(false)
           .sortByDateTakenDesc()
@@ -153,12 +172,13 @@ class ExamIsarService implements IExamIsarService {
 
   @override
   Future<void> markExamResultSynced(Id resultId) async {
-    if (_isar != null && _isar.isOpen) {
-      await _isar.writeTxn(() async {
-        final existing = await _isar.examResults.get(resultId);
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      await isar.writeTxn(() async {
+        final existing = await isar.examResults.get(resultId);
         if (existing != null) {
           existing.isSynced = true;
-          await _isar.examResults.put(existing);
+          await isar.examResults.put(existing);
         }
       });
     }
@@ -178,6 +198,121 @@ class ExamIsarService implements IExamIsarService {
 
   void _notifyResultsChanged() {
     _resultsStreamController.add(List<ExamResult>.from(_fallbackResultsCache));
+  }
+
+  @override
+  Future<Id> saveUserProgress(UserProgress progress) async {
+    // Crucial: offline actions strictly default to isSynced = false
+    progress.isSynced = false;
+
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      Id insertedId = 0;
+      await isar.writeTxn(() async {
+        insertedId = await isar.userProgress.put(progress);
+      });
+      return insertedId;
+    }
+
+    final id = progress.id == Isar.autoIncrement
+        ? _fallbackProgressCache.length + 1
+        : progress.id;
+    final saved = progress.copyWith(id: id, isSynced: false);
+    _fallbackProgressCache.removeWhere((p) => p.subjectId == progress.subjectId);
+    _fallbackProgressCache.add(saved);
+    return id;
+  }
+
+  @override
+  Future<List<UserProgress>> getAllUserProgress() async {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.userProgress.where().findAll();
+    }
+    return List<UserProgress>.from(_fallbackProgressCache);
+  }
+
+  @override
+  Future<UserProgress?> getUserProgressBySubject(String subjectId) async {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.userProgress
+          .filter()
+          .subjectIdEqualTo(subjectId)
+          .findFirst();
+    }
+    final matches = _fallbackProgressCache
+        .where((p) => p.subjectId.toLowerCase() == subjectId.toLowerCase());
+    return matches.isNotEmpty ? matches.first : null;
+  }
+
+  @override
+  Future<List<UserProgress>> getUnsyncedUserProgress() async {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      return await isar.userProgress
+          .filter()
+          .isSyncedEqualTo(false)
+          .findAll();
+    }
+    return _fallbackProgressCache.where((p) => !p.isSynced).toList();
+  }
+
+  @override
+  Future<void> markUserProgressSynced(Id progressId) async {
+    final isar = _isar;
+    if (isar != null && isar.isOpen) {
+      await isar.writeTxn(() async {
+        final existing = await isar.userProgress.get(progressId);
+        if (existing != null) {
+          existing.isSynced = true;
+          await isar.userProgress.put(existing);
+        }
+      });
+    }
+
+    final index = _fallbackProgressCache.indexWhere((p) => p.id == progressId);
+    if (index != -1) {
+      _fallbackProgressCache[index] =
+          _fallbackProgressCache[index].copyWith(isSynced: true);
+    }
+  }
+
+  void _seedSampleUserProgressIfEmpty() {
+    if (_fallbackProgressCache.isNotEmpty) return;
+    final now = DateTime.now();
+    _fallbackProgressCache.addAll([
+      UserProgress(
+        id: 1,
+        userId: 'local_student',
+        subjectId: 'herrega',
+        totalQuestionsAttempted: 45,
+        totalCorrectAnswers: 38,
+        totalTimeSpentSeconds: 3600,
+        lastStudiedAt: now.subtract(const Duration(hours: 2)),
+        isSynced: true,
+      ),
+      UserProgress(
+        id: 2,
+        userId: 'local_student',
+        subjectId: 'afaan_oromoo',
+        totalQuestionsAttempted: 50,
+        totalCorrectAnswers: 44,
+        totalTimeSpentSeconds: 4200,
+        lastStudiedAt: now.subtract(const Duration(days: 1)),
+        isSynced: true,
+      ),
+      UserProgress(
+        id: 3,
+        userId: 'local_student',
+        subjectId: 'saayinsii_waliigalaa',
+        totalQuestionsAttempted: 30,
+        totalCorrectAnswers: 25,
+        totalTimeSpentSeconds: 2400,
+        lastStudiedAt: now.subtract(const Duration(days: 2)),
+        isSynced: true,
+      ),
+    ]);
   }
 
   /// Seed high-quality Grade 8 ministry-aligned mock questions in Afaan Oromoo
