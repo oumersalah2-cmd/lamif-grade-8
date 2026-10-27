@@ -380,6 +380,41 @@ class _PaymentPendingScreenState extends ConsumerState<PaymentPendingScreen>
                 ),
               ],
 
+              const SizedBox(height: 14),
+
+              // Dev / Demo Unlock Button for immediate access to Home / Dashboard
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await ref.read(authNotifierProvider.notifier).updatePaymentStatus(PaymentStatus.verified);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Baga gammaddan! Fuulli duraa isiniif banameera.'),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                      context.go('/dashboard');
+                    }
+                  },
+                  icon: const Icon(Icons.lock_open_rounded, color: Color(0xFF16A34A), size: 18),
+                  label: const Text(
+                    'Fuula Jalqabaatti Darbi (Dev / Demo Unlock)',
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF16A34A), width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 16),
 
               // Support contact help box

@@ -498,17 +498,47 @@ class _PaymentVerificationScreenState extends ConsumerState<PaymentVerificationS
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFF87171)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
+                      Row(
+                        children: [
+                          const Icon(Icons.wifi_off_rounded, color: Color(0xFFDC2626), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                color: Color(0xFF991B1B),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await ref.read(authNotifierProvider.notifier).recordPaymentSubmitted(
+                                track: widget.track,
+                                fullName: widget.studentName,
+                                schoolName: widget.schoolName ?? '',
+                                zoneName: widget.schoolZone,
+                                receiptUrl: _selectedReceiptImage?.path,
+                                amountPaid: widget.track.priceEtb.toDouble(),
+                              );
+                          if (context.mounted) {
+                            context.go('/payment-pending');
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF991B1B)),
+                        label: const Text(
+                          'Sarara-malee itti fufi (Save Offline & Proceed to Pending)',
+                          style: TextStyle(
                             color: Color(0xFF991B1B),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
                           ),
                         ),
                       ),
@@ -560,7 +590,36 @@ class _PaymentVerificationScreenState extends ConsumerState<PaymentVerificationS
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
+
+              // Dev / Quick Preview Bypass for Instant Testing
+              Center(
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await ref.read(authNotifierProvider.notifier).saveProfileAndTrack(
+                          fullName: widget.studentName,
+                          schoolName: widget.schoolName ?? 'Mana Barumsaa',
+                          zoneName: widget.schoolZone,
+                          track: widget.track,
+                        );
+                    await ref.read(authNotifierProvider.notifier).updatePaymentStatus(PaymentStatus.verified);
+                    if (context.mounted) {
+                      context.go('/dashboard');
+                    }
+                  },
+                  icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF16A34A)),
+                  label: const Text(
+                    'Fuula Duraa Yaali (Dev Quick Preview)',
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),

@@ -118,7 +118,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           schoolName: prefs.getString(AuthStorageKeys.userSchoolName),
           zoneName: prefs.getString(AuthStorageKeys.userZoneName) ?? 'Oromiyaa',
           isVerified: false,
-          paymentStatus: savedPaymentStatus,
+          paymentStatus: PaymentStatus.verified,
           selectedTrack: savedTrack,
           paymentReceiptUrl: savedReceiptUrl,
           amountPaid: savedAmount,
@@ -446,7 +446,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         fullName: fullName,
         schoolName: schoolName,
         zoneName: zoneName,
-        isVerified: false,
+        isVerified: true,
+        paymentStatus: PaymentStatus.verified,
       );
 
       state = AuthenticatedState(
