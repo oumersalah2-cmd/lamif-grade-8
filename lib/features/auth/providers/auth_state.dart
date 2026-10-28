@@ -11,13 +11,50 @@ class AuthInitial extends AuthState {
   const AuthInitial();
 }
 
-/// In-flight operation (sending OTP, verifying, saving profile)
+/// In-flight operation (login, register, verifying, saving profile)
 class AuthLoading extends AuthState {
   final String? message;
   const AuthLoading({this.message});
 }
 
-/// Firebase OTP was successfully dispatched to user's phone
+/// Device has a stored account & PIN hash; user must enter 6-digit PIN to unlock
+class AuthPinRequiredState extends AuthState {
+  final String? studentName;
+  final String phoneNumber;
+  final bool isLocked;
+  final int remainingLockoutSeconds;
+  final int failedAttempts;
+  final bool requiresOnlineRecovery;
+
+  const AuthPinRequiredState({
+    this.studentName,
+    required this.phoneNumber,
+    this.isLocked = false,
+    this.remainingLockoutSeconds = 0,
+    this.failedAttempts = 0,
+    this.requiresOnlineRecovery = false,
+  });
+
+  AuthPinRequiredState copyWith({
+    String? studentName,
+    String? phoneNumber,
+    bool? isLocked,
+    int? remainingLockoutSeconds,
+    int? failedAttempts,
+    bool? requiresOnlineRecovery,
+  }) {
+    return AuthPinRequiredState(
+      studentName: studentName ?? this.studentName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      isLocked: isLocked ?? this.isLocked,
+      remainingLockoutSeconds: remainingLockoutSeconds ?? this.remainingLockoutSeconds,
+      failedAttempts: failedAttempts ?? this.failedAttempts,
+      requiresOnlineRecovery: requiresOnlineRecovery ?? this.requiresOnlineRecovery,
+    );
+  }
+}
+
+/// OTP was dispatched to user's phone (used only when REQUIRE_PHONE_OTP_AT_SIGNUP=true)
 class OtpSentState extends AuthState {
   final String verificationId;
   final String phoneNumber;
@@ -53,12 +90,18 @@ class AuthenticatedState extends AuthState {
   final StudentTrack track;
   final bool isOfflineSession;
   final bool isOnboarded;
+  final bool mustSetPin;
+  final int graceDaysRemaining;
+  final bool isGraceExpired;
 
   const AuthenticatedState({
     required this.user,
     required this.track,
     this.isOfflineSession = false,
     this.isOnboarded = true,
+    this.mustSetPin = false,
+    this.graceDaysRemaining = 21,
+    this.isGraceExpired = false,
   });
 
   AuthenticatedState copyWith({
@@ -66,12 +109,18 @@ class AuthenticatedState extends AuthState {
     StudentTrack? track,
     bool? isOfflineSession,
     bool? isOnboarded,
+    bool? mustSetPin,
+    int? graceDaysRemaining,
+    bool? isGraceExpired,
   }) {
     return AuthenticatedState(
       user: user ?? this.user,
       track: track ?? this.track,
       isOfflineSession: isOfflineSession ?? this.isOfflineSession,
       isOnboarded: isOnboarded ?? this.isOnboarded,
+      mustSetPin: mustSetPin ?? this.mustSetPin,
+      graceDaysRemaining: graceDaysRemaining ?? this.graceDaysRemaining,
+      isGraceExpired: isGraceExpired ?? this.isGraceExpired,
     );
   }
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
 import '../models/payment_status.dart';
 import '../models/student_track.dart';
 import '../services/auth_service.dart';
+import '../services/pin_offline_service.dart';
 import 'auth_state.dart';
 
 // Storage keys for persistent preferences
@@ -23,15 +23,22 @@ class AuthStorageKeys {
   static const String amountPaid = 'auth_amount_paid';
 }
 
+/// Provider for PinOfflineService
+final pinOfflineServiceProvider = Provider<PinOfflineService>((ref) {
+  return PinOfflineService();
+});
+
 /// Provider for the AuthService interface
 final authServiceProvider = Provider<IAuthService>((ref) {
-  return FirebaseAuthService();
+  final pinOffline = ref.watch(pinOfflineServiceProvider);
+  return FirebaseAuthService(pinOfflineService: pinOffline);
 });
 
 /// StateNotifierProvider for managing global authentication & onboarding flow
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
-  return AuthNotifier(authService);
+  final pinOffline = ref.watch(pinOfflineServiceProvider);
+  return AuthNotifier(authService, pinOffline);
 });
 
 /// Convenience provider for checking if user is fully logged in and onboarded
@@ -64,16 +71,15 @@ final studentTrackProvider = Provider<StudentTrack>((ref) {
   if (state is AuthenticatedState) {
     return state.track;
   }
-  return StudentTrack.both; // Default academic fallback
+  return StudentTrack.both;
 });
 
-/// Dynamic feature flag for Dashboard to hide or show "Ifa Boru" specific exam modules
+/// Dynamic feature flags for Dashboard
 final shouldShowIfaBoruProvider = Provider<bool>((ref) {
   final track = ref.watch(studentTrackProvider);
   return track == StudentTrack.ifaBoruOnly || track == StudentTrack.both;
 });
 
-/// Dynamic feature flag for Dashboard to hide or show "Ministry Exam" specific modules
 final shouldShowMinistryProvider = Provider<bool>((ref) {
   final track = ref.watch(studentTrackProvider);
   return track == StudentTrack.ministryOnly || track == StudentTrack.both;
@@ -93,24 +99,38 @@ final isPaymentVerifiedProvider = Provider<bool>((ref) {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final IAuthService _authService;
+  final PinOfflineService _pinOfflineService;
 
-  AuthNotifier(this._authService) : super(const AuthInitial()) {
+  AuthNotifier(this._authService, this._pinOfflineService) : super(const AuthInitial()) {
     checkInitialSession();
   }
 
-  /// Automatically check if user was already signed in and restore chosen track
+  /// Automatically check if user has a stored PIN hash or active session
   Future<void> checkInitialSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final isOnboarded = prefs.getBool(AuthStorageKeys.isOnboarded) ?? false;
-      final savedTrackStr = prefs.getString(AuthStorageKeys.studentTrack);
-      final savedTrack = StudentTrack.fromStorageValue(savedTrackStr);
-      final savedPaymentStatus = PaymentStatus.fromString(prefs.getString(AuthStorageKeys.paymentStatus));
-      final savedReceiptUrl = prefs.getString(AuthStorageKeys.paymentReceiptUrl);
-      final savedAmount = prefs.getDouble(AuthStorageKeys.amountPaid);
+      final hasPin = await _pinOfflineService.hasConfiguredPin();
+      if (hasPin) {
+        final profile = await _pinOfflineService.getUserProfile();
+        final lockout = await _pinOfflineService.getLockoutStatus();
+        final phone = profile['phone'] ?? '';
+        final name = profile['name'];
 
+        state = AuthPinRequiredState(
+          studentName: name,
+          phoneNumber: phone,
+          isLocked: lockout.isLocked,
+          remainingLockoutSeconds: lockout.remainingSeconds,
+          failedAttempts: lockout.failedAttempts,
+          requiresOnlineRecovery: lockout.requiresOnlineRecovery,
+        );
+        return;
+      }
+
+      // Check SharedPreferences for guest session fallback
+      final prefs = await SharedPreferences.getInstance();
       final isGuestSession = prefs.getBool(AuthStorageKeys.isGuest) ?? false;
-      if (isGuestSession && isOnboarded) {
+      if (isGuestSession) {
+        final savedTrack = StudentTrack.fromStorageValue(prefs.getString(AuthStorageKeys.studentTrack));
         final guestUser = AuthUser(
           uid: prefs.getString(AuthStorageKeys.userUid) ?? 'offline_guest',
           phoneNumber: prefs.getString(AuthStorageKeys.userPhone) ?? 'Offline Guest',
@@ -120,8 +140,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isVerified: false,
           paymentStatus: PaymentStatus.verified,
           selectedTrack: savedTrack,
-          paymentReceiptUrl: savedReceiptUrl,
-          amountPaid: savedAmount,
         );
         state = AuthenticatedState(
           user: guestUser,
@@ -132,209 +150,266 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return;
       }
 
-      // Check Firebase session
-      final firebaseUser = await _authService.restoreSession();
-      if (firebaseUser != null) {
-        if (isOnboarded) {
-          final enrichedUser = firebaseUser.copyWith(
-            fullName: prefs.getString(AuthStorageKeys.userFullName) ?? firebaseUser.fullName,
-            schoolName: prefs.getString(AuthStorageKeys.userSchoolName) ?? firebaseUser.schoolName,
-            zoneName: prefs.getString(AuthStorageKeys.userZoneName) ?? firebaseUser.zoneName,
-            paymentStatus: savedPaymentStatus,
-            selectedTrack: savedTrack,
-            paymentReceiptUrl: savedReceiptUrl,
-            amountPaid: savedAmount,
-          );
-          state = AuthenticatedState(
-            user: enrichedUser,
-            track: savedTrack,
-            isOfflineSession: false,
-            isOnboarded: true,
-          );
-        } else {
-          // Phone is verified but needs profile & track selection
-          state = OtpVerifiedState(
-            uid: firebaseUser.uid,
-            phoneNumber: firebaseUser.phoneNumber,
-            existingFullName: prefs.getString(AuthStorageKeys.userFullName),
-            existingSchool: prefs.getString(AuthStorageKeys.userSchoolName),
-            existingZone: prefs.getString(AuthStorageKeys.userZoneName),
-          );
-        }
-      } else {
-        state = const UnauthenticatedState();
-      }
+      state = const UnauthenticatedState();
     } catch (_) {
       state = const UnauthenticatedState();
     }
   }
 
-  /// Send Phone OTP via Firebase Auth
-  Future<void> sendOtp(String rawPhoneNumber) async {
-    final cleaned = rawPhoneNumber.trim().replaceAll(' ', '');
-    final formattedPhone = cleaned.startsWith('+')
-        ? cleaned
-        : '+251${cleaned.replaceFirst(RegExp(r'^0'), '')}';
-
-    state = const AuthLoading(message: "Koodiin OTP bilbila keessaniitti ergamaa jira...");
-
-    try {
-      await _authService.sendOtp(
-        phoneNumber: formattedPhone,
-        onCodeSent: (verificationId, resendToken) {
-          state = OtpSentState(
-            verificationId: verificationId,
-            phoneNumber: formattedPhone,
-            resendToken: resendToken,
-          );
-        },
-        onVerificationFailed: (FirebaseAuthException e) {
-          final errorMsg = _mapFirebaseErrorToAfaanOromo(e);
-          state = AuthErrorState(
-            errorMessageOm: errorMsg,
-            technicalError: e.message,
-          );
-        },
-        onVerificationCompleted: (PhoneAuthCredential credential) async {
-          // Instant auto-verification (Android SMS Retriever API)
-          if (credential.smsCode != null && state is OtpSentState) {
-            await verifyOtp(smsCode: credential.smsCode!);
-          }
-        },
-        onCodeAutoRetrievalTimeout: (verificationId) {
-          // Timeout occurred; user can still manually enter SMS code
-        },
-      );
-    } catch (e) {
-      state = AuthErrorState(
-        errorMessageOm: "Ergamuun OTP hin milkoofne. Sarara intarneetii ykn bilbilaa mirkaneeffadhaa.",
-        technicalError: e.toString(),
-      );
-    }
-  }
-
-  /// Verify entered OTP code and transition to Track Selection / Profile Setup
-  Future<bool> verifyOtp({
-    required String smsCode,
-    String? fullName,
-    String? schoolName,
-    String? zoneName,
-  }) async {
-    final currentState = state;
-    if (currentState is! OtpSentState) {
-      state = const AuthErrorState(
-        errorMessageOm: "Dursa lakkoofsa bilbilaatiin koodii gaafadhaa.",
+  /// Daily Offline Unlock: Verifies 6-digit PIN against local PBKDF2 salted hash
+  Future<bool> verifyOfflinePin(String pin) async {
+    final cur = state is AuthPinRequiredState ? (state as AuthPinRequiredState) : null;
+    final lockout = await _pinOfflineService.getLockoutStatus();
+    if (lockout.isLocked) {
+      state = AuthPinRequiredState(
+        phoneNumber: cur?.phoneNumber ?? '',
+        studentName: cur?.studentName,
+        isLocked: true,
+        remainingLockoutSeconds: lockout.remainingSeconds,
+        failedAttempts: lockout.failedAttempts,
+        requiresOnlineRecovery: lockout.requiresOnlineRecovery,
       );
       return false;
     }
 
-    state = const AuthLoading(message: "Koodiin mirkanaa'aa jira...");
+    final isValid = await _pinOfflineService.verifyOfflinePin(pin);
 
-    try {
-      final user = await _authService.verifyOtpAndLogin(
-        verificationId: currentState.verificationId,
-        smsCode: smsCode.trim(),
-        fullName: fullName,
-        schoolName: schoolName,
-        zoneName: zoneName,
-      );
+    if (isValid) {
+      await _pinOfflineService.resetLockoutOnSuccess();
+      final profile = await _pinOfflineService.getUserProfile();
+      final token = await _pinOfflineService.getAccessToken();
+      final track = StudentTrack.fromStorageValue(profile['track']);
+      final remainingGraceDays = await _pinOfflineService.getRemainingGraceDays();
+      final isGraceExpired = await _pinOfflineService.isGracePeriodExpired();
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AuthStorageKeys.userUid, user.uid);
-      await prefs.setString(AuthStorageKeys.userPhone, user.phoneNumber);
-
-      final isOnboarded = prefs.getBool(AuthStorageKeys.isOnboarded) ?? false;
-      final savedTrackStr = prefs.getString(AuthStorageKeys.studentTrack);
-
-      if (isOnboarded && savedTrackStr != null) {
-        state = AuthenticatedState(
-          user: user.copyWith(
-            fullName: fullName ?? prefs.getString(AuthStorageKeys.userFullName),
-            schoolName: schoolName ?? prefs.getString(AuthStorageKeys.userSchoolName),
-            zoneName: zoneName ?? prefs.getString(AuthStorageKeys.userZoneName),
-          ),
-          track: StudentTrack.fromStorageValue(savedTrackStr),
-          isOnboarded: true,
-        );
-      } else {
-        // Transition to Profile & Track Selection Screen
-        state = OtpVerifiedState(
-          uid: user.uid,
-          phoneNumber: user.phoneNumber,
-          existingFullName: fullName ?? prefs.getString(AuthStorageKeys.userFullName),
-          existingSchool: schoolName ?? prefs.getString(AuthStorageKeys.userSchoolName),
-          existingZone: zoneName ?? prefs.getString(AuthStorageKeys.userZoneName),
-        );
-      }
-      return true;
-    } on FirebaseAuthException catch (e) {
-      state = AuthErrorState(
-        errorMessageOm: _mapFirebaseErrorToAfaanOromo(e),
-        technicalError: e.message,
-      );
-      return false;
-    } catch (e) {
-      state = AuthErrorState(
-        errorMessageOm: "Koodii sirrii hin taane ykn yeroon isaa darbeera.",
-        technicalError: e.toString(),
-      );
-      return false;
-    }
-  }
-
-  /// Store user profile and crucial studentTrack enum to local storage
-  Future<void> saveProfileAndTrack({
-    required String fullName,
-    required String schoolName,
-    required String zoneName,
-    required StudentTrack track,
-  }) async {
-    state = const AuthLoading(message: "Sagantaan filatame galmaa'aa jira...");
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Persist chosen track and profile data
-      await prefs.setString(AuthStorageKeys.studentTrack, track.storageValue);
-      await prefs.setBool(AuthStorageKeys.isOnboarded, true);
-      await prefs.setString(AuthStorageKeys.userFullName, fullName.trim());
-      await prefs.setString(AuthStorageKeys.userSchoolName, schoolName.trim());
-      await prefs.setString(AuthStorageKeys.userZoneName, zoneName.trim());
-
-      String uid = prefs.getString(AuthStorageKeys.userUid) ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-      String phone = prefs.getString(AuthStorageKeys.userPhone) ?? '+251';
-
-      if (state is OtpVerifiedState) {
-        final verifiedState = state as OtpVerifiedState;
-        uid = verifiedState.uid;
-        phone = verifiedState.phoneNumber;
-      }
-
-      final updatedUser = AuthUser(
-        uid: uid,
-        phoneNumber: phone,
-        fullName: fullName.trim(),
-        schoolName: schoolName.trim(),
-        zoneName: zoneName.trim(),
+      final user = AuthUser(
+        uid: profile['uid'] ?? 'local_user',
+        phoneNumber: profile['phone'] ?? '',
+        fullName: profile['name'],
+        schoolName: profile['schoolName'],
+        zoneName: profile['schoolZone'],
+        backendToken: token,
         isVerified: true,
-        createdAt: DateTime.now(),
+        paymentStatus: PaymentStatus.fromString(profile['paymentStatus']),
+        selectedTrack: track,
       );
 
       state = AuthenticatedState(
-        user: updatedUser,
+        user: user,
         track: track,
-        isOfflineSession: false,
+        isOfflineSession: true,
         isOnboarded: true,
+        graceDaysRemaining: remainingGraceDays,
+        isGraceExpired: isGraceExpired,
       );
-    } catch (e) {
-      state = AuthErrorState(
-        errorMessageOm: "Galmeen sagantaa hin milkoofne. Irra deebi'aa yaalaa.",
-        technicalError: e.toString(),
+      return true;
+    } else {
+      final updatedLockout = await _pinOfflineService.recordFailedPinAttempt();
+      final curPinState = state is AuthPinRequiredState ? (state as AuthPinRequiredState) : null;
+
+      state = AuthPinRequiredState(
+        phoneNumber: curPinState?.phoneNumber ?? '',
+        studentName: curPinState?.studentName,
+        isLocked: updatedLockout.isLocked,
+        remainingLockoutSeconds: updatedLockout.remainingSeconds,
+        failedAttempts: updatedLockout.failedAttempts,
+        requiresOnlineRecovery: updatedLockout.requiresOnlineRecovery,
       );
+      return false;
     }
   }
 
-  /// Record submitted payment receipt with PENDING status
+  /// Signup Once Online: Registers student account and sets up local offline PIN
+  Future<bool> signupWithPin({
+    required String name,
+    required String phone,
+    required String schoolZone,
+    String? schoolName,
+    required StudentTrack track,
+    required String pin,
+    String? otpCode,
+  }) async {
+    state = const AuthLoading(message: "Herregni keessan tolfamaa jira...");
+
+    try {
+      final user = await _authService.signupWithPin(
+        name: name,
+        phone: phone,
+        schoolZone: schoolZone,
+        schoolName: schoolName,
+        track: track,
+        pin: pin,
+        otpCode: otpCode,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AuthStorageKeys.studentTrack, track.storageValue);
+      await prefs.setBool(AuthStorageKeys.isOnboarded, true);
+
+      state = AuthenticatedState(
+        user: user,
+        track: track,
+        isOfflineSession: false,
+        isOnboarded: true,
+        graceDaysRemaining: 21,
+      );
+      return true;
+    } on AuthException catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: e.message,
+        technicalError: e.code,
+      );
+      return false;
+    } catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: "Dogoggorri galmee mudateera. Intarneetii keessan ilaalaa.",
+        technicalError: e.toString(),
+      );
+      return false;
+    }
+  }
+
+  /// Online Login (New phone or reinstall)
+  Future<bool> loginOnline({
+    required String phone,
+    required String pin,
+  }) async {
+    state = const AuthLoading(message: "Seensaan mirkanaa'aa jira...");
+
+    try {
+      final user = await _authService.loginWithPin(phone: phone, pin: pin);
+      final track = user.selectedTrack ?? StudentTrack.both;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AuthStorageKeys.studentTrack, track.storageValue);
+      await prefs.setBool(AuthStorageKeys.isOnboarded, true);
+
+      state = AuthenticatedState(
+        user: user,
+        track: track,
+        isOfflineSession: false,
+        isOnboarded: true,
+        graceDaysRemaining: 21,
+      );
+      return true;
+    } on AuthException catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: e.message,
+        technicalError: e.code,
+      );
+      return false;
+    } catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: "Seensi hin milkoofne. Sarara intarneetii ykn PIN mirkaneeffadhaa.",
+        technicalError: e.toString(),
+      );
+      return false;
+    }
+  }
+
+  /// Reset PIN using single-use 15-minute temporary code from school admin
+  Future<bool> resetPinWithCode({
+    required String phone,
+    required String resetCode,
+    required String newPin,
+  }) async {
+    state = const AuthLoading(message: "PIN haaraan galmaa'aa jira...");
+
+    try {
+      final success = await _authService.resetPinWithCode(
+        phone: phone,
+        resetCode: resetCode,
+        newPin: newPin,
+      );
+
+      if (success) {
+        state = AuthPinRequiredState(
+          phoneNumber: phone,
+          isLocked: false,
+          remainingLockoutSeconds: 0,
+          failedAttempts: 0,
+          requiresOnlineRecovery: false,
+        );
+        return true;
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: e.message,
+        technicalError: e.code,
+      );
+      return false;
+    } catch (e) {
+      state = AuthErrorState(
+        errorMessageOm: "Deebisaan PIN hin milkoofne. Irra deebi'aa yaalaa.",
+        technicalError: e.toString(),
+      );
+      return false;
+    }
+  }
+
+  /// In-App PIN Change
+  Future<bool> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    final s = state;
+    if (s is! AuthenticatedState) return false;
+    final currentUser = s.user;
+
+    state = const AuthLoading(message: "PIN jijjiiramaa jira...");
+
+    try {
+      final success = await _authService.changePin(
+        phone: currentUser.phoneNumber,
+        currentPin: currentPin,
+        newPin: newPin,
+      );
+      if (success) {
+        state = s.copyWith();
+        return true;
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = AuthErrorState(errorMessageOm: e.message, technicalError: e.code);
+      return false;
+    } catch (e) {
+      state = AuthErrorState(errorMessageOm: "Jijjiirraan PIN hin milkoofne: $e");
+      return false;
+    }
+  }
+
+  /// Secure Account Deletion: Requires PIN verification
+  Future<bool> deleteAccount({required String pin}) async {
+    final s = state;
+    if (s is! AuthenticatedState) return false;
+    final currentUser = s.user;
+
+    state = const AuthLoading(message: "Herregni keessan haqamaa jira...");
+
+    try {
+      final success = await _authService.deleteAccount(
+        phone: currentUser.phoneNumber,
+        pin: pin,
+      );
+
+      if (success) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+        state = const UnauthenticatedState();
+        return true;
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = AuthErrorState(errorMessageOm: e.message, technicalError: e.code);
+      return false;
+    } catch (e) {
+      state = AuthErrorState(errorMessageOm: "Haqiinsi herregaa hin milkoofne: $e");
+      return false;
+    }
+  }
+
+  /// Record submitted payment receipt with PENDING status (preserves payment workflow)
   Future<void> recordPaymentSubmitted({
     required StudentTrack track,
     required String fullName,
@@ -361,14 +436,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String uid = prefs.getString(AuthStorageKeys.userUid) ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
       String phone = prefs.getString(AuthStorageKeys.userPhone) ?? '+251';
 
-      if (state is OtpVerifiedState) {
-        final verifiedState = state as OtpVerifiedState;
-        uid = verifiedState.uid;
-        phone = verifiedState.phoneNumber;
-      } else if (state is AuthenticatedState) {
-        final authState = state as AuthenticatedState;
-        uid = authState.user.uid;
-        phone = authState.user.phoneNumber;
+      final s = state;
+      if (s is AuthenticatedState) {
+        uid = s.user.uid;
+        phone = s.user.phoneNumber;
       }
 
       final updatedUser = AuthUser(
@@ -396,7 +467,62 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Update payment verification status (e.g. from PENDING to VERIFIED)
+  /// Switch account for shared phones: Clears secure storage and shows login screen
+  Future<void> switchAccount() async {
+    await _pinOfflineService.clearSecureStorage();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AuthStorageKeys.isOnboarded);
+    await prefs.remove(AuthStorageKeys.userUid);
+    state = const UnauthenticatedState();
+  }
+
+  /// Log out and clear state
+  Future<void> signOut() async {
+    state = const AuthLoading();
+    try {
+      await _pinOfflineService.clearSecureStorage();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AuthStorageKeys.isOnboarded);
+      await prefs.remove(AuthStorageKeys.userUid);
+      await prefs.remove(AuthStorageKeys.isGuest);
+      await _authService.signOut();
+      state = const UnauthenticatedState();
+    } catch (_) {
+      state = const UnauthenticatedState();
+    }
+  }
+
+  void clearError() {
+    if (state is AuthErrorState) {
+      checkInitialSession();
+    }
+  }
+
+  // Legacy stubs for existing tests and components
+  Future<void> saveProfileAndTrack({
+    required String fullName,
+    required String schoolName,
+    required String zoneName,
+    required StudentTrack track,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AuthStorageKeys.studentTrack, track.storageValue);
+    await prefs.setBool(AuthStorageKeys.isOnboarded, true);
+
+    if (state is AuthenticatedState) {
+      final cur = state as AuthenticatedState;
+      state = cur.copyWith(
+        track: track,
+        user: cur.user.copyWith(
+          fullName: fullName,
+          schoolName: schoolName,
+          zoneName: zoneName,
+          selectedTrack: track,
+        ),
+      );
+    }
+  }
+
   Future<void> updatePaymentStatus(PaymentStatus newStatus) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AuthStorageKeys.paymentStatus, newStatus.prismaValue);
@@ -408,18 +534,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Change active track later from Settings or Dashboard header
-  Future<void> updateTrack(StudentTrack newTrack) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AuthStorageKeys.studentTrack, newTrack.storageValue);
-
-    final currentState = state;
-    if (currentState is AuthenticatedState) {
-      state = currentState.copyWith(track: newTrack);
-    }
-  }
-
-  /// Guest Mode: Allows immediate offline access for students without SIM/Internet
   Future<void> continueAsGuest({
     String fullName = "Barataa Kutaa 8ffaa (Offline)",
     String zoneName = "Oromiyaa",
@@ -461,50 +575,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessageOm: "Seensi sarara-malee hin milkoofne.",
         technicalError: e.toString(),
       );
-    }
-  }
-
-  /// Log out and clear state
-  Future<void> signOut() async {
-    state = const AuthLoading();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(AuthStorageKeys.isOnboarded);
-      await prefs.remove(AuthStorageKeys.userUid);
-      await prefs.remove(AuthStorageKeys.isGuest);
-      // Keep student track preference so it remembers their choice on next login
-
-      await _authService.signOut();
-      state = const UnauthenticatedState();
-    } catch (_) {
-      state = const UnauthenticatedState();
-    }
-  }
-
-  void resetToPhoneInput() {
-    state = const UnauthenticatedState();
-  }
-
-  void clearError() {
-    if (state is AuthErrorState) {
-      state = const UnauthenticatedState();
-    }
-  }
-
-  String _mapFirebaseErrorToAfaanOromo(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'invalid-phone-number':
-        return 'Lakkoofsi bilbilaa kun sirrii miti. (+251...) fayyadamaa.';
-      case 'invalid-verification-code':
-        return 'Koodiin OTP galftan dogoggora. Irra deebi\'aa yaalaa.';
-      case 'session-expired':
-        return 'Yeroon koodii OTP darbeera. Haaraa gaafadhaa.';
-      case 'too-many-requests':
-        return 'Yeroo baay\'ee yaaltaniittu. Xiqqoo eegaatii deebisaa yaalaa.';
-      case 'network-request-failed':
-        return 'Qunnamtiin intarneetii addaan citeera. Sarara keessan ilaalaa.';
-      default:
-        return 'Dogoggorri seensaa uumameera. Irra deebi\'aa yaalaa.';
     }
   }
 }

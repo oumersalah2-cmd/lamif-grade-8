@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/question_schema.dart';
 import '../models/exam_result_schema.dart';
 import '../models/user_progress_schema.dart';
@@ -26,6 +29,11 @@ abstract class IExamIsarService {
   Future<UserProgress?> getUserProgressBySubject(String subjectId);
   Future<List<UserProgress>> getUnsyncedUserProgress();
   Future<void> markUserProgressSynced(Id progressId);
+
+  // Immediate tap persistence for active exam crash tolerance
+  Future<void> saveAnswerDraft(String subjectId, int questionIndex, int optionIndex);
+  Future<Map<int, int>> loadAnswerDrafts(String subjectId);
+  Future<void> clearAnswerDrafts(String subjectId);
 }
 
 /// Robust offline Isar implementation with persistent caching and seeds
@@ -275,6 +283,51 @@ class ExamIsarService implements IExamIsarService {
     if (index != -1) {
       _fallbackProgressCache[index] =
           _fallbackProgressCache[index].copyWith(isSynced: true);
+    }
+  }
+
+  @override
+  Future<void> saveAnswerDraft(String subjectId, int questionIndex, int optionIndex) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'draft_answers_$subjectId';
+      final existingJson = prefs.getString(key);
+      Map<String, dynamic> map = {};
+      if (existingJson != null) {
+        try {
+          map = Map<String, dynamic>.from(jsonDecode(existingJson) as Map);
+        } catch (_) {}
+      }
+      map[questionIndex.toString()] = optionIndex;
+      await prefs.setString(key, jsonEncode(map));
+    } catch (e) {
+      debugPrint('[ExamIsarService] Error saving answer draft: $e');
+    }
+  }
+
+  @override
+  Future<Map<int, int>> loadAnswerDrafts(String subjectId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'draft_answers_$subjectId';
+      final existingJson = prefs.getString(key);
+      if (existingJson != null) {
+        final Map<String, dynamic> raw = Map<String, dynamic>.from(jsonDecode(existingJson) as Map);
+        return raw.map((k, v) => MapEntry(int.parse(k), v as int));
+      }
+    } catch (e) {
+      debugPrint('[ExamIsarService] Error loading answer drafts: $e');
+    }
+    return {};
+  }
+
+  @override
+  Future<void> clearAnswerDrafts(String subjectId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('draft_answers_$subjectId');
+    } catch (e) {
+      debugPrint('[ExamIsarService] Error clearing answer drafts: $e');
     }
   }
 

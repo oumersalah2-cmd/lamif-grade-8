@@ -37,6 +37,17 @@ model User {
   amountPaid        Float?         // 200.0 or 300.0 ETB
   rejectionReason   String?        // Optional reason if payment is rejected
   verifiedAt        DateTime?      // Timestamp when admin verified payment
+
+  // Security & Offline PIN-Based Auth
+  pinHash           String?        // Salted bcrypt hash of 6-digit PIN (never stored plain)
+  mustSetPin        Boolean        @default(false) // Safe path for legacy accounts without a PIN
+  refreshTokenHash  String?        // Salted hash of long-lived refresh token
+  tokenRevokedAt    DateTime?      // Invalidation timestamp (revokes tokens issued prior)
+  pinResetCodeHash  String?        // Salted hash of 15-min temporary admin reset code
+  pinResetExpiresAt DateTime?      // Expiry timestamp for reset code
+  failedAttempts    Int            @default(0) // Failed login attempt counter for server-side rate limiting
+  lockedUntil       DateTime?      // Temporary lockout expiry timestamp
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 

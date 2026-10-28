@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="om">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lamif Kutaa 8 - Gaaffii Herrega Haquu (Account Deletion Request)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      padding: 24px 16px;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      max-width: 520px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+    h1 {
+      font-size: 20px;
+      color: #15803d;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 14px;
+      color: #64748b;
+      margin-top: -6px;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    p {
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: #334155;
+    }
+    .warning {
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #991b1b;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 15px;
+      box-sizing: border-box;
+      margin-bottom: 16px;
+    }
+    button {
+      width: 100%;
+      background-color: #dc2626;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #b91c1c;
+    }
+    .footer {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 24px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Lamif Kutaa 8 Prep</h1>
+    <h2>Gaaffii Herrega fi Ragaa Haquu • Account Deletion Request</h2>
+
+    <p>
+      Akka seera eegumsa ragaa fi ulaagaa Google Playtti, barataan kamiyyuu herrega fi ragaalee isaa guutummaatti haquuf mirga qaba.
+    </p>
+
+    <div class="warning">
+      <strong>Akeekkachiisa (Warning):</strong> Herrega kee yoo haqxe, qabxiin qormaata kee hundi, sochii qayyabannoo, fi nagaheen kafaltii kee database fi serverii keenya irraa guutummaatti ni haqama. Ragaan kun deebi'ee hin argamu.
+    </div>
+
+    <form action="/api/v1/auth/delete-account" method="POST">
+      <label for="phone">Lakkoofsa Bilbilaa (Registered Phone Number):</label>
+      <input type="text" id="phone" name="phone" placeholder="Fkn: 0911000000 ykn +251911000000" required>
+
+      <label for="pin">PIN Seensaa Dijiitii 6 (6-Digit Security PIN):</label>
+      <input type="password" id="pin" name="pin" placeholder="••••••" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
+
+      <p style="font-size: 12px; color: #64748b; margin-top: -6px; margin-bottom: 16px;">
+        PIN kee mirkaneessuun nama biraan akka herregni kee hin haqamne eega. (Your PIN prevents unauthorized account deletion).
+      </p>
+
+      <button type="submit" onclick="return confirm('DHAABBAATAADHA (PERMANENT): Ragaa kee guutummaatti haquu mirkaneessitaa? Qabxiin qormaata fi kaffaltiin kee deebi\'ee hin argamu! Are you 100% sure you want to permanently delete your account and all exam data?');">
+        Herrega Koo Dhaabbataan Haqi (Permanently Delete My Data)
+      </button>
+    </form>
+
+    <div class="footer">
+      Email deeggarsaa (Support): support@lamif.org<br>
+      Biiroo Barnoota Oromiyaa • Lamif Kutaa 8 Prep
+    </div>
+  </div>
+</body>
+</html>

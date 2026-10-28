@@ -11,12 +11,15 @@ export 'providers/auth_notifier.dart';
 
 // Services
 export 'services/auth_service.dart';
+export 'services/pin_offline_service.dart';
 
 // Widgets
 export 'widgets/track_selection_card.dart';
 
 // Screens / Views
 export 'views/phone_auth_screen.dart';
+export 'views/pin_login_screen.dart';
+export 'views/admin_pin_reset_dialog.dart';
 export 'views/track_selection_screen.dart';
 
 // Router & Navigation

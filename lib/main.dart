@@ -1,17 +1,39 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'core/theme/theme_provider.dart';
+import 'core/analytics/analytics_service.dart';
 import 'features/auth/routes/auth_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final analyticsService = AnalyticsService();
+
   try {
     await Firebase.initializeApp();
+    await analyticsService.initialize();
+
+    // 1. Capture framework fatal errors
+    FlutterError.onError = (errorDetails) {
+      if (analyticsService.hasConsent) {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+      }
+      FlutterError.presentError(errorDetails);
+    };
+
+    // 2. Capture uncaught asynchronous platform errors
+    PlatformDispatcher.instance.onError = (error, stack) {
+      if (analyticsService.hasConsent) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
+      return true;
+    };
   } catch (e) {
-    debugPrint('Firebase initialization skipped or not configured: $e');
+    debugPrint('Firebase / Crashlytics initialization skipped or not configured: $e');
   }
 
   // Set system UI overlay style for academic aesthetic

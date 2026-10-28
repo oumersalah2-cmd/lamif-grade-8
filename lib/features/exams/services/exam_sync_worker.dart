@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -387,12 +388,86 @@ class ExamWorkManagerService {
     }
   }
 
+  // --- Jittered Batch Sync with Exponential Backoff ---
+  Timer? _jitterTimer;
+  int _consecutiveFailures = 0;
+  final math.Random _random = math.Random();
+  bool _isJitterLoopActive = false;
+
+  /// Starts the in-app jittered batch sync loop (60s + random 0-30s)
+  /// with exponential backoff on network failures.
+  void startJitteredSyncLoop({String? authToken}) {
+    if (_isJitterLoopActive) return;
+    _isJitterLoopActive = true;
+    _consecutiveFailures = 0;
+    _scheduleNextJitteredSync(authToken: authToken);
+    debugPrint('[ExamWorkManagerService] Jittered batch sync loop started.');
+  }
+
+  void _scheduleNextJitteredSync({String? authToken}) {
+    _jitterTimer?.cancel();
+    if (!_isJitterLoopActive) return;
+
+    // Base interval: 60s + random 0-30s
+    int baseSeconds = 60 + _random.nextInt(31);
+
+    // Exponential backoff if consecutive failures occurred (caps at 300s = 5m)
+    if (_consecutiveFailures > 0) {
+      final backoffMultiplier = 1 << math.min(_consecutiveFailures, 4); // Max 16x
+      baseSeconds = math.min(300, baseSeconds * backoffMultiplier);
+    }
+
+    debugPrint(
+      '[ExamWorkManagerService] Next jittered sync in $baseSeconds seconds (consecutive failures: $_consecutiveFailures).',
+    );
+
+    _jitterTimer = Timer(Duration(seconds: baseSeconds), () async {
+      await _runJitteredBatchSync(authToken: authToken);
+    });
+  }
+
+  Future<void> _runJitteredBatchSync({String? authToken}) async {
+    if (!_isJitterLoopActive) return;
+
+    // Check if there are actually pending items before attempting network call
+    final unsyncedExams = await _isarService.getUnsyncedExamResults();
+    final unsyncedProg = await _isarService.getUnsyncedUserProgress();
+
+    if (unsyncedExams.isEmpty && unsyncedProg.isEmpty) {
+      _consecutiveFailures = 0;
+      _scheduleNextJitteredSync(authToken: authToken);
+      return;
+    }
+
+    debugPrint(
+      '[ExamWorkManagerService] Executing jittered sync for ${unsyncedExams.length} exams & ${unsyncedProg.length} progress...',
+    );
+
+    final result = await performForegroundSync(authToken: authToken);
+    if (result.isSuccess) {
+      _consecutiveFailures = 0;
+    } else {
+      _consecutiveFailures++;
+    }
+
+    _scheduleNextJitteredSync(authToken: authToken);
+  }
+
+  /// Stops active in-app jittered sync loop
+  void stopJitteredSyncLoop() {
+    _isJitterLoopActive = false;
+    _jitterTimer?.cancel();
+    _jitterTimer = null;
+    debugPrint('[ExamWorkManagerService] Jittered batch sync loop stopped.');
+  }
+
   void _updateStatus(BackgroundSyncStatus status) {
     _currentStatus = status;
     _statusController.add(status);
   }
 
   void dispose() {
+    stopJitteredSyncLoop();
     _statusController.close();
     _lastResultController.close();
   }

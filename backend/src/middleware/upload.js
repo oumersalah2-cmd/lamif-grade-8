@@ -38,7 +38,7 @@ const fileFilter = (req, file, cb) => {
 export const receiptUpload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit for high-resolution mobile screenshots
+    fileSize: 5 * 1024 * 1024, // 5MB limit optimal for mobile receipts without exhausting VPS disk
   },
   fileFilter,
 });

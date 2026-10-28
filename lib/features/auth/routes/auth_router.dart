@@ -7,6 +7,7 @@ import '../models/payment_status.dart';
 import '../providers/auth_notifier.dart';
 import '../providers/auth_state.dart';
 import '../views/phone_auth_screen.dart';
+import '../views/pin_login_screen.dart';
 import '../views/track_selection_screen.dart';
 import '../views/payment_verification_screen.dart';
 import '../views/payment_pending_screen.dart';
@@ -20,6 +21,9 @@ import '../../study/views/study_notes_screen.dart';
 import '../../schedule/views/schedule_screen.dart';
 import '../../leaderboard/views/leaderboard_screen.dart';
 import '../../search/views/search_screen.dart';
+import '../../study/views/grade_calculator_screen.dart';
+import '../../study/views/weak_topics_screen.dart';
+import '../../settings/privacy_settings_dialog.dart';
 
 /// Centralized GoRouter configuration integrating Authentication & Onboarding
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -33,6 +37,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const PhoneAuthScreen(),
+      ),
+      GoRoute(
+        path: '/pin-login',
+        name: 'pin_login',
+        builder: (context, state) => const PinLoginScreen(),
       ),
       GoRoute(
         path: '/onboarding/track-selection',
@@ -103,9 +112,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'performance_analysis',
         builder: (context, state) => const PerformanceAnalysisScreen(),
       ),
+      GoRoute(
+        path: '/grade-calculator',
+        name: 'grade_calculator',
+        builder: (context, state) => const GradeCalculatorScreen(),
+      ),
+      GoRoute(
+        path: '/weak-topics',
+        name: 'weak_topics',
+        builder: (context, state) => const WeakTopicsScreen(),
+      ),
     ],
     redirect: (context, state) {
       final isLoggingIn = state.matchedLocation == '/login';
+      final isPinLogin = state.matchedLocation == '/pin-login';
       final isSelectingTrack = state.matchedLocation == '/onboarding/track-selection';
       final isVerifyingPayment = state.matchedLocation == '/payment-verification';
       final isPaymentPending = state.matchedLocation == '/payment-pending';
@@ -115,17 +135,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // 2. Unauthenticated -> Send to Login
+      // 2. PIN required for daily offline unlock
+      if (authState is AuthPinRequiredState) {
+        return isPinLogin ? null : '/pin-login';
+      }
+
+      // 3. Unauthenticated -> Send to Login
       if (authState is UnauthenticatedState || authState is AuthErrorState) {
         return isLoggingIn ? null : '/login';
       }
 
-      // 3. Phone verified but not onboarded -> Send to Track Selection
+      // 4. Phone verified but not onboarded -> Send to Track Selection
       if (authState is OtpVerifiedState) {
         return (isSelectingTrack || isVerifyingPayment) ? null : '/onboarding/track-selection';
       }
 
-      // 4. Authenticated & Onboarded -> Check Payment Verification
+      // 5. Authenticated & Onboarded -> Check Payment Verification
       if (authState is AuthenticatedState) {
         if (!authState.isOnboarded) {
           return (isSelectingTrack || isVerifyingPayment) ? null : '/onboarding/track-selection';
@@ -141,8 +166,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return '/payment-pending'; // lock out and redirect
         }
 
-        // If verified, prevent navigating back to login, pending, or onboarding
-        if (isLoggingIn || isSelectingTrack || isVerifyingPayment || isPaymentPending) {
+        // If verified, prevent navigating back to login, pin-login, pending, or onboarding
+        if (isLoggingIn || isPinLogin || isSelectingTrack || isVerifyingPayment || isPaymentPending) {
           return '/dashboard';
         }
       }
@@ -185,6 +210,11 @@ class AcademicDashboardScreen extends ConsumerWidget {
                   : Icons.light_mode_rounded,
             ),
             onPressed: () => _showThemeDialog(context, ref),
+          ),
+          IconButton(
+            tooltip: 'Qindaa\'ina Dhuunfaa (Privacy)',
+            icon: const Icon(Icons.privacy_tip_outlined),
+            onPressed: () => PrivacySettingsDialog.show(context),
           ),
           IconButton(
             tooltip: 'Ba\'i (Sign Out)',
@@ -322,6 +352,45 @@ class AcademicDashboardScreen extends ConsumerWidget {
                 color: const Color(0xFF0D47A1),
                 badge: 'Xiinxala',
                 onTap: () => context.push('/performance-analysis'),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Section: Study Tools & Grade Calculator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    'Shallaggii fi Meeshaalee Qayyabannoo',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Grade calculation, target planner & weak-topic review',
+                style: TextStyle(fontSize: 12.5, color: Colors.grey),
+              ),
+              const SizedBox(height: 10),
+              _buildExamModuleCard(
+                title: 'Shallaggii Qabxii & Karoora (Grade Calculator)',
+                subtitle: 'Giddu-galeessa herregi, karoora qabxii qopheeffadhu',
+                icon: Icons.calculate_rounded,
+                color: const Color(0xFF15803D),
+                badge: 'Haaraa',
+                onTap: () => context.push('/grade-calculator'),
+              ),
+              const SizedBox(height: 10),
+              _buildExamModuleCard(
+                title: 'Mata-dureewwan Dadhaboo (Weak Topics Quiz)',
+                subtitle: 'Mata-dureewwan qabxii gadi-aanaa qaban adda baasiitii shaakali',
+                icon: Icons.auto_graph_rounded,
+                color: const Color(0xFFB45309),
+                badge: 'Shaakala',
+                onTap: () => context.push('/weak-topics'),
               ),
 
               const SizedBox(height: 30),

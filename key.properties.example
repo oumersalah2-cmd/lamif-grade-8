@@ -1,0 +1,8 @@
+# Google Play Release Keystore Configuration
+# NEVER commit key.properties or your .jks file to source control!
+# Place your release keystore at: android/my-upload-key.jks or specify absolute path
+
+storeFile=my-upload-key.jks
+storePassword=your_keystore_password_here
+keyAlias=upload
+keyPassword=your_key_password_here

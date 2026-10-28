@@ -56,8 +56,12 @@ class ExamNotifier extends StateNotifier<ExamState> {
         return;
       }
 
+      // Load any existing draft answers saved on previous interruption
+      final savedDrafts = await _isarService.loadAnswerDrafts(subjectId);
+
       state = state.copyWith(
         questions: cachedQuestions,
+        selectedAnswers: savedDrafts,
         status: ExamStatus.inProgress,
       );
 
@@ -103,6 +107,9 @@ class ExamNotifier extends StateNotifier<ExamState> {
     updatedAnswers[questionIndex] = optionIndex;
 
     state = state.copyWith(selectedAnswers: updatedAnswers);
+
+    // Save every answer to local offline storage immediately on tap
+    _isarService.saveAnswerDraft(state.subjectId, questionIndex, optionIndex);
   }
 
   /// Select answer for the currently active question
@@ -178,6 +185,9 @@ class ExamNotifier extends StateNotifier<ExamState> {
     try {
       final savedId = await _isarService.saveExamResult(examResult);
       final finalPersistedResult = examResult.copyWith(id: savedId);
+
+      // Clear completed draft answers from disk
+      await _isarService.clearAnswerDrafts(state.subjectId);
 
       state = state.copyWith(
         status: ExamStatus.completed,

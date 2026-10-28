@@ -5,6 +5,7 @@ import '../models/exam_result_schema.dart';
 import '../providers/exam_notifier.dart';
 import '../providers/exam_state.dart';
 import 'exam_history_screen.dart';
+import '../../study/services/study_offline_service.dart';
 
 
 /// Active Exam Screen (Qormaata Kutaa 8ffaa)
@@ -28,6 +29,7 @@ class ExamScreen extends ConsumerStatefulWidget {
 
 class _ExamScreenState extends ConsumerState<ExamScreen> {
   late final ExamNotifierParams _params;
+  final Set<int> _flaggedIndices = {};
 
   @override
   void initState() {
@@ -45,11 +47,16 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final examNotifier = ref.read(examNotifierProvider(_params).notifier);
     final theme = Theme.of(context);
 
-    // If exam is completed, show the result view
+    // If exam is completed, show the result view and track study activity
     if (examState.status == ExamStatus.completed &&
         examState.finalResult != null) {
+      ref.read(studyOfflineServiceProvider).recordStudyActivity(
+            questionsCount: examState.totalQuestions,
+          );
       return _buildResultView(context, examState.finalResult!, examState);
     }
+
+    final isCurrentFlagged = _flaggedIndices.contains(examState.currentQuestionIndex);
 
     return Scaffold(
       appBar: AppBar(
@@ -70,6 +77,33 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           ],
         ),
         actions: [
+          if (examState.status == ExamStatus.inProgress) ...[
+            // Flag for review button
+            IconButton(
+              tooltip: isCurrentFlagged
+                  ? 'Mallattoo Kaasi (Unflag)'
+                  : 'Mallattoo Itti Godhi (Flag for review)',
+              icon: Icon(
+                isCurrentFlagged ? Icons.flag_rounded : Icons.outlined_flag_rounded,
+                color: isCurrentFlagged ? Colors.orange.shade700 : null,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (isCurrentFlagged) {
+                    _flaggedIndices.remove(examState.currentQuestionIndex);
+                  } else {
+                    _flaggedIndices.add(examState.currentQuestionIndex);
+                  }
+                });
+              },
+            ),
+            // Question Palette button
+            IconButton(
+              tooltip: 'Tarree Gaaffilee (Question Palette)',
+              icon: const Icon(Icons.grid_view_rounded),
+              onPressed: () => _showQuestionPaletteBottomSheet(context, examState, examNotifier),
+            ),
+          ],
           IconButton(
             tooltip: 'Qormaata Dhiisi',
             icon: const Icon(Icons.close),
@@ -606,6 +640,154 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Bottom sheet showing full question palette matrix with flag-for-review status
+  void _showQuestionPaletteBottomSheet(
+    BuildContext context,
+    ExamState examState,
+    ExamNotifier examNotifier,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final answeredCount = examState.selectedAnswers.length;
+        final flaggedCount = _flaggedIndices.length;
+        final unansweredCount = examState.totalQuestions - answeredCount;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Tarree Gaaffilee (Question Palette)',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Legend Status
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildPaletteLegendItem('Deebifame ($answeredCount)', Colors.green.shade600),
+                    _buildPaletteLegendItem('Mallatteeffame ($flaggedCount)', Colors.orange.shade700),
+                    _buildPaletteLegendItem('Hafan ($unansweredCount)', Colors.grey.shade400),
+                  ],
+                ),
+                const Divider(height: 20),
+
+                // Question Palette Grid (48x48dp touch targets)
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Center(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: List.generate(examState.questions.length, (index) {
+                          final isCurrent = examState.currentQuestionIndex == index;
+                          final isAnswered = examState.selectedAnswers.containsKey(index);
+                          final isFlagged = _flaggedIndices.contains(index);
+
+                          Color bgColor = const Color(0xFFF1F5F9);
+                          Color textColor = const Color(0xFF334155);
+
+                          if (isFlagged) {
+                            bgColor = Colors.orange.shade100;
+                            textColor = Colors.orange.shade900;
+                          } else if (isAnswered) {
+                            bgColor = Colors.green.shade100;
+                            textColor = Colors.green.shade900;
+                          }
+
+                          return Semantics(
+                            button: true,
+                            label: 'Gara gaaffii ${index + 1} deemi',
+                            child: InkWell(
+                              onTap: () {
+                                examNotifier.goToQuestion(index);
+                                Navigator.pop(ctx);
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: bgColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isCurrent
+                                        ? const Color(0xFF2563EB)
+                                        : (isFlagged ? Colors.orange : Colors.transparent),
+                                    width: isCurrent ? 2.5 : 1.0,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Text(
+                                      '${index + 1}',
+                                      style: TextStyle(
+                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                                        fontSize: 14,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    if (isFlagged)
+                                      const Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: Icon(Icons.flag, size: 10, color: Colors.orange),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaletteLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w500)),
+      ],
     );
   }
 

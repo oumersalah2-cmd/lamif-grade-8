@@ -22,8 +22,10 @@ dependencies:
   isar_flutter_libs: ^3.1.0+1
   path_provider: ^2.1.2
 
-  # Key-Value Persistence
+  # Key-Value Persistence & Secure Storage
   shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.3
 
   # Network & REST APIs
   http: ^1.2.1
@@ -41,6 +43,8 @@ dependencies:
 
   # Media & File Upload
   image_picker: ^1.1.2
+  firebase_analytics: ^10.10.7
+  firebase_crashlytics: ^3.5.7
 
 dev_dependencies:
   flutter_test:
