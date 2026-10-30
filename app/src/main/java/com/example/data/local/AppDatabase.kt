@@ -53,51 +53,54 @@ abstract class AppDatabase : RoomDatabase() {
 
     fun getDatabase(context: Context): AppDatabase {
       return INSTANCE ?: synchronized(this) {
-        val instance = Room.databaseBuilder(
-          context.applicationContext,
-          AppDatabase::class.java,
-          "lamif_kutaa8_db"
-        )
-        .addCallback(object : Callback() {
-          override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            CoroutineScope(Dispatchers.IO).launch {
-              val database = getDatabase(context)
-              database.questionDao().insertAll(PreloadedQuestions.questions)
-              database.userDao().saveUserProfile(
-                UserProfileEntity(
-                  id = "current_student",
-                  fullName = "Barataa Kutaa 8ffaa",
-                  phoneNumber = "+251911234567",
-                  zoneName = "Shawaa Bahaa",
-                  schoolName = "Mana Barumsaa Sad. 1ffaa",
-                  targetScore = 90,
-                  isVerified = false,
-                  streakDays = 3
-                )
+        val instance = INSTANCE ?: buildDatabase(context.applicationContext).also { INSTANCE = it }
+        instance
+      }
+    }
+
+    private fun buildDatabase(appContext: Context): AppDatabase {
+      return Room.databaseBuilder(
+        appContext,
+        AppDatabase::class.java,
+        "lamif_kutaa8_db"
+      )
+      .addCallback(object : Callback() {
+        override fun onCreate(db: SupportSQLiteDatabase) {
+          super.onCreate(db)
+          CoroutineScope(Dispatchers.IO).launch {
+            val database = INSTANCE ?: return@launch
+            database.questionDao().insertAll(PreloadedQuestions.questions)
+            database.userDao().saveUserProfile(
+              UserProfileEntity(
+                id = "current_student",
+                fullName = "Barataa Kutaa 8ffaa",
+                phoneNumber = "+251911234567",
+                zoneName = "Shawaa Bahaa",
+                schoolName = "Mana Barumsaa Sad. 1ffaa",
+                targetScore = 90,
+                isVerified = false,
+                streakDays = 3
               )
+            )
+            seedInitialSessions(database)
+          }
+        }
+
+        override fun onOpen(db: SupportSQLiteDatabase) {
+          super.onOpen(db)
+          CoroutineScope(Dispatchers.IO).launch {
+            val database = INSTANCE ?: return@launch
+            if (database.questionDao().getQuestionsCount() == 0) {
+              database.questionDao().insertAll(PreloadedQuestions.questions)
+            }
+            if (database.studySessionDao().getSessionsCount() == 0) {
               seedInitialSessions(database)
             }
           }
-
-          override fun onOpen(db: SupportSQLiteDatabase) {
-            super.onOpen(db)
-            CoroutineScope(Dispatchers.IO).launch {
-              val database = getDatabase(context)
-              if (database.questionDao().getQuestionsCount() == 0) {
-                database.questionDao().insertAll(PreloadedQuestions.questions)
-              }
-              if (database.studySessionDao().getSessionsCount() == 0) {
-                seedInitialSessions(database)
-              }
-            }
-          }
-        })
-        .fallbackToDestructiveMigration()
-        .build()
-        INSTANCE = instance
-        instance
-      }
+        }
+      })
+      .fallbackToDestructiveMigration()
+      .build()
     }
 
     private suspend fun seedInitialSessions(database: AppDatabase) {

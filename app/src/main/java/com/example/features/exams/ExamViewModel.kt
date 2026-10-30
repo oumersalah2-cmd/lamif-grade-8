@@ -1,6 +1,7 @@
 package com.example.features.exams
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
@@ -46,6 +47,16 @@ class ExamViewModel(application: Application) : AndroidViewModel(application) {
   val uiState: StateFlow<ExamUiState> = _uiState.asStateFlow()
 
   private var timerJob: Job? = null
+  private var examEndTimeMillis: Long = 0L
+
+  init {
+    viewModelScope.launch {
+      repository.getAllBookmarks().collect { bookmarks ->
+        val bookmarkedIds = bookmarks.map { it.questionId }.toSet()
+        _uiState.update { it.copy(bookmarkedQuestions = bookmarkedIds) }
+      }
+    }
+  }
 
   fun startExam(subject: Subject, mode: ExamMode, customMinutes: Int? = null) {
     viewModelScope.launch {
@@ -105,16 +116,17 @@ class ExamViewModel(application: Application) : AndroidViewModel(application) {
 
   private fun startTimer() {
     timerJob?.cancel()
+    examEndTimeMillis = SystemClock.elapsedRealtime() + _uiState.value.remainingSeconds * 1000L
     timerJob = viewModelScope.launch {
       while (_uiState.value.remainingSeconds > 0 && !_uiState.value.isFinished) {
-        delay(1000)
-        if (!_uiState.value.isPaused) {
+        delay(500)
+        if (!_uiState.value.isPaused && !_uiState.value.isFinished) {
+          val remaining = maxOf(0L, (examEndTimeMillis - SystemClock.elapsedRealtime() + 999L) / 1000L)
           _uiState.update { current ->
-            val next = current.remainingSeconds - 1
-            if (next <= 0) {
+            if (remaining <= 0) {
               current.copy(remainingSeconds = 0, isTimeUp = true)
             } else {
-              current.copy(remainingSeconds = next)
+              current.copy(remainingSeconds = remaining)
             }
           }
           if (_uiState.value.remainingSeconds <= 0) {
@@ -175,20 +187,30 @@ class ExamViewModel(application: Application) : AndroidViewModel(application) {
     }
   }
 
-  fun toggleBookmarkCurrentQuestion() {
-    val qId = currentQuestion?.id ?: return
+  fun toggleBookmark(questionId: String) {
     viewModelScope.launch {
-      val isSaved = repository.toggleBookmark(qId)
+      val isSaved = repository.toggleBookmark(questionId)
       _uiState.update { state ->
         val newBookmarks = state.bookmarkedQuestions.toMutableSet()
-        if (isSaved) newBookmarks.add(qId) else newBookmarks.remove(qId)
+        if (isSaved) newBookmarks.add(questionId) else newBookmarks.remove(questionId)
         state.copy(bookmarkedQuestions = newBookmarks)
       }
     }
   }
 
+  fun toggleBookmarkCurrentQuestion() {
+    val qId = currentQuestion?.id ?: return
+    toggleBookmark(qId)
+  }
+
   fun togglePause() {
-    _uiState.update { it.copy(isPaused = !it.isPaused) }
+    _uiState.update { current ->
+      val newPaused = !current.isPaused
+      if (!newPaused) {
+        examEndTimeMillis = SystemClock.elapsedRealtime() + current.remainingSeconds * 1000L
+      }
+      current.copy(isPaused = newPaused)
+    }
   }
 
   fun submitExam() {

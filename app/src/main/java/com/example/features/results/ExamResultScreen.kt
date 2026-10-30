@@ -345,7 +345,7 @@ fun ExamResultScreen(
           selectedOptionIdx = selectedOptionIdx,
           isCorrect = isCorrect,
           isBookmarked = state.bookmarkedQuestions.contains(question.id),
-          onToggleBookmark = { viewModel.toggleBookmarkCurrentQuestion() }
+          onToggleBookmark = { viewModel.toggleBookmark(question.id) }
         )
       }
     }
