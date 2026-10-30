@@ -30,3 +30,9 @@ key.properties
 !debug.keystore
 build/symbols/
 symbols/
+
+# Admin Activation Tool Private Keys (NEVER COMMIT)
+admin_tool/*.pem
+admin_tool/keys/
+admin_tool/private_key.hex
+

@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.example.core.crypto.ActivationSecurityManager
+
 data class HomeUiState(
   val studentName: String = "Barataa Kutaa 8ffaa",
   val zoneName: String = "Shawaa Bahaa",
@@ -28,11 +30,13 @@ data class HomeUiState(
   val isSyncing: Boolean = false,
   val syncMessage: String? = null,
   val recentAttempts: List<ExamAttemptEntity> = emptyList(),
-  val mistakeQuestionsCount: Int = 0
+  val mistakeQuestionsCount: Int = 0,
+  val isActivated: Boolean = false
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
   private val repository = ExamRepository(AppDatabase.getDatabase(application))
+  private val activationSecurityManager = ActivationSecurityManager(application)
 
   private val _isSyncing = MutableStateFlow(false)
   val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -43,10 +47,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   val uiState: StateFlow<HomeUiState> = combine(
     repository.getUserProfile(),
     repository.getAllAttempts(),
-    repository.getPendingSyncCount(),
+    activationSecurityManager.isActivatedFlow,
     _isSyncing,
     _syncMessage
-  ) { profile, attempts, pendingSync, syncing, msg ->
+  ) { profile, attempts, isActivated, syncing, msg ->
     val avg = if (attempts.isNotEmpty()) {
       attempts.map { it.scorePercentage }.average().toInt()
     } else 0
@@ -59,10 +63,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
       targetScore = profile?.targetScore ?: 90,
       totalExamsTaken = attempts.size,
       averageScore = avg,
-      pendingSyncCount = pendingSync,
+      pendingSyncCount = 0,
       isSyncing = syncing,
       syncMessage = msg,
-      recentAttempts = attempts.take(5)
+      recentAttempts = attempts.take(5),
+      isActivated = isActivated
     )
   }.stateIn(
     scope = viewModelScope,

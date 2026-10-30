@@ -5,12 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.data.local.dao.ActivationDao
 import com.example.data.local.dao.BookmarkDao
 import com.example.data.local.dao.ExamDao
 import com.example.data.local.dao.QuestionDao
 import com.example.data.local.dao.StudySessionDao
 import com.example.data.local.dao.SyncDao
 import com.example.data.local.dao.UserDao
+import com.example.data.local.entities.ActivationEntity
 import com.example.data.local.entities.BookmarkEntity
 import com.example.data.local.entities.ExamAttemptEntity
 import com.example.data.local.entities.QuestionEntity
@@ -30,9 +32,10 @@ import java.util.UUID
     BookmarkEntity::class,
     UserProfileEntity::class,
     SyncQueueEntity::class,
-    StudySessionEntity::class
+    StudySessionEntity::class,
+    ActivationEntity::class
   ],
-  version = 2,
+  version = 3,
   exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun userDao(): UserDao
   abstract fun syncDao(): SyncDao
   abstract fun studySessionDao(): StudySessionDao
+  abstract fun activationDao(): ActivationDao
 
   companion object {
     @Volatile

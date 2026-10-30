@@ -27,9 +27,10 @@ import com.example.features.home.HomeScreen
 import com.example.features.home.HomeViewModel
 import com.example.features.results.ExamResultScreen
 import com.example.features.schedule.ScheduleScreen
+import com.example.features.activation.ActivationScreen
+import com.example.features.activation.ActivationViewModel
 import com.example.features.schedule.ScheduleViewModel
 import com.example.features.study.StudyNotesScreen
-import com.example.data.sync.ExamSyncManager
 import com.example.ui.theme.MyApplicationTheme
 
 enum class AppScreen {
@@ -38,7 +39,8 @@ enum class AppScreen {
   RESULT,
   STUDY_NOTES,
   SCHEDULE,
-  PROFILE
+  PROFILE,
+  ACTIVATION
 }
 
 class MainActivity : ComponentActivity() {
@@ -47,8 +49,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    // Initialize WorkManager background sync service monitoring network availability
-    ExamSyncManager.schedulePeriodicSync(applicationContext)
+    // 100% Offline-first: No remote sync or network calls initiated
 
     // Check if launched from study reminder notification
     if (intent?.getStringExtra(com.example.features.schedule.notifications.StudyNotificationHelper.EXTRA_OPEN_SCREEN) ==
@@ -104,6 +105,7 @@ fun LamifKutaa8App(
   val examViewModel: ExamViewModel = viewModel()
   val authViewModel: AuthViewModel = viewModel()
   val scheduleViewModel: ScheduleViewModel = viewModel()
+  val activationViewModel: ActivationViewModel = viewModel()
 
   var lastSubject by remember { mutableStateOf(Subject.AFAAN_OROMOO) }
   var lastMode by remember { mutableStateOf(ExamMode.MOCK_MINISTRY) }
@@ -122,6 +124,7 @@ fun LamifKutaa8App(
         },
         onOpenStudyNotes = { currentScreen = AppScreen.STUDY_NOTES },
         onOpenProfile = { currentScreen = AppScreen.PROFILE },
+        onOpenActivation = { currentScreen = AppScreen.ACTIVATION },
         onReviewMistakes = {
           examViewModel.startMistakesExam()
           currentScreen = AppScreen.EXAM
@@ -191,6 +194,19 @@ fun LamifKutaa8App(
         viewModel = authViewModel,
         themeMode = themeMode,
         onThemeModeChanged = onThemeModeChanged,
+        onOpenActivation = { currentScreen = AppScreen.ACTIVATION },
+        onNavigateBack = {
+          currentScreen = AppScreen.HOME
+        }
+      )
+    }
+
+    AppScreen.ACTIVATION -> {
+      BackHandler {
+        currentScreen = AppScreen.HOME
+      }
+      ActivationScreen(
+        viewModel = activationViewModel,
         onNavigateBack = {
           currentScreen = AppScreen.HOME
         }

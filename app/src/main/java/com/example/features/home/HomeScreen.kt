@@ -33,6 +33,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,11 +80,13 @@ fun HomeScreen(
   onOpenProfile: () -> Unit,
   onReviewMistakes: () -> Unit,
   onOpenSchedule: () -> Unit,
+  onOpenActivation: () -> Unit = {},
   themeMode: AppThemeMode = AppThemeMode.SYSTEM,
   onQuickToggleTheme: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val state by viewModel.uiState.collectAsState()
+  var showLockedDialog by remember { mutableStateOf(false) }
 
   Scaffold(
     topBar = {
@@ -244,20 +251,20 @@ fun HomeScreen(
             }
           }
         }
-      }
-
-      // 2. Offline Sync Banner
+          // 2. Offline Activation Banner
       item {
         Card(
           shape = RoundedCornerShape(16.dp),
           colors = CardDefaults.cardColors(
-            containerColor = if (state.pendingSyncCount > 0) {
-              MaterialTheme.colorScheme.secondaryContainer
+            containerColor = if (state.isActivated) {
+              Color(0xFFDCFCE7)
             } else {
-              MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+              Color(0xFFFEF3C7)
             }
           ),
-          modifier = Modifier.fillMaxWidth()
+          modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenActivation() }
         ) {
           Row(
             modifier = Modifier
@@ -271,67 +278,48 @@ fun HomeScreen(
               modifier = Modifier.weight(1f)
             ) {
               Icon(
-                imageVector = if (state.pendingSyncCount > 0) Icons.Default.CloudUpload else Icons.Default.CloudDone,
+                imageVector = if (state.isActivated) Icons.Default.VerifiedUser else Icons.Default.Lock,
                 contentDescription = null,
-                tint = if (state.pendingSyncCount > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                tint = if (state.isActivated) Color(0xFF15803D) else Color(0xFFD97706),
                 modifier = Modifier.size(24.dp)
               )
               Spacer(modifier = Modifier.width(10.dp))
               Column {
                 Text(
-                  text = if (state.pendingSyncCount > 0) {
-                    "Qabxiiwwan Kuufaman: ${state.pendingSyncCount}"
+                  text = if (state.isActivated) {
+                    "Moobaayilli Keessan Bantameera 🌟"
                   } else {
-                    "Daataan Guutummaatti Qindaa'eera (Synced)"
+                    "Qormaata Hunda Banadhaa (Offline Activation)"
                   },
                   fontWeight = FontWeight.SemiBold,
                   fontSize = 13.sp,
-                  color = MaterialTheme.colorScheme.onSurface
+                  color = if (state.isActivated) Color(0xFF15803D) else Color(0xFF92400E)
                 )
                 Text(
-                  text = if (state.pendingSyncCount > 0) {
-                    "Offline qormaata fudhatte; yeroo intarneetii argattu ergi"
+                  text = if (state.isActivated) {
+                    "Qormaata ministirii hunda daangaa malee fayyadamaa"
                   } else {
-                    "Offline-first: Intarneetii malee qormaata hunda hojjedhu"
+                    "Shaakalli bilisa; qormaata mock ministirii guutuu banachuuf tuqaa"
                   },
                   fontSize = 11.sp,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant
+                  color = if (state.isActivated) Color(0xFF166534) else Color(0xFFB45309)
                 )
               }
             }
 
-            if (state.pendingSyncCount > 0) {
+            if (!state.isActivated) {
               Button(
-                onClick = { viewModel.triggerSync() },
-                enabled = !state.isSyncing,
-                modifier = Modifier.testTag("sync_now_button"),
-                colors = ButtonDefaults.buttonColors(
-                  containerColor = MaterialTheme.colorScheme.secondary
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                onClick = onOpenActivation,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
               ) {
-                if (state.isSyncing) {
-                  CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                  )
-                } else {
-                  Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                      imageVector = Icons.Default.Refresh,
-                      contentDescription = null,
-                      modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Qindeessi", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                  }
-                }
+                Text("Banadhu", fontSize = 11.sp, fontWeight = FontWeight.Bold)
               }
             }
           }
         }
-      }
+      }    }
 
       // 3. Quick Action Tiles
       item {
@@ -419,9 +407,41 @@ fun HomeScreen(
       items(Subject.entries) { subject ->
         SubjectCardItem(
           subject = subject,
-          onStartExam = onStartExam
+          isActivated = state.isActivated,
+          onStartExam = onStartExam,
+          onLockedClick = { showLockedDialog = true }
         )
       }
+    }
+
+    if (showLockedDialog) {
+      AlertDialog(
+        onDismissRequest = { showLockedDialog = false },
+        title = {
+          Text("Qormaata Ministirii Guutuu (Full Mock Exam)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        },
+        text = {
+          Text(
+            "Shaakalli daangaa malee bilisa. Qormaata ministirii naannoo guutuu banachuuf koodii mirkaneessaa galchaa.",
+            fontSize = 13.sp
+          )
+        },
+        confirmButton = {
+          Button(
+            onClick = {
+              showLockedDialog = false
+              onOpenActivation()
+            }
+          ) {
+            Text("Koodii Galchi (Activate)")
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = { showLockedDialog = false }) {
+            Text("Hafte")
+          }
+        }
+      )
     }
   }
 }
@@ -508,7 +528,9 @@ fun QuickActionCard(
 @Composable
 fun SubjectCardItem(
   subject: Subject,
-  onStartExam: (Subject, ExamMode) -> Unit
+  isActivated: Boolean,
+  onStartExam: (Subject, ExamMode) -> Unit,
+  onLockedClick: () -> Unit
 ) {
   Card(
     shape = RoundedCornerShape(16.dp),
@@ -561,6 +583,7 @@ fun SubjectCardItem(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
+        // Free Practice Button (Always available without activation)
         Button(
           onClick = { onStartExam(subject, ExamMode.PRACTICE) },
           modifier = Modifier
@@ -574,32 +597,40 @@ fun SubjectCardItem(
           contentPadding = PaddingValues(vertical = 8.dp)
         ) {
           Text(
-            text = "Shaakala (Study)",
+            text = "Shaakala (Bilisa)",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
           )
         }
 
+        // Full Ministry Exam (Locked unless activated)
         Button(
-          onClick = { onStartExam(subject, ExamMode.MOCK_MINISTRY) },
+          onClick = {
+            if (isActivated) {
+              onStartExam(subject, ExamMode.MOCK_MINISTRY)
+            } else {
+              onLockedClick()
+            }
+          },
           modifier = Modifier
             .weight(1f)
             .testTag("exam_btn_${subject.id}"),
           shape = RoundedCornerShape(10.dp),
           colors = ButtonDefaults.buttonColors(
-            containerColor = subject.accentColor
+            containerColor = if (isActivated) subject.accentColor else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isActivated) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
           ),
           contentPadding = PaddingValues(vertical = 8.dp)
         ) {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-              imageVector = Icons.Default.PlayArrow,
+              imageVector = if (isActivated) Icons.Default.PlayArrow else Icons.Default.Lock,
               contentDescription = null,
               modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = "Qormaata Jalqabi",
+              text = if (isActivated) "Qormaata Jalqabi" else "Cufameera",
               fontSize = 12.sp,
               fontWeight = FontWeight.Bold
             )

@@ -70,6 +70,7 @@ import com.example.ui.theme.ThemeSettingCard
 fun ProfileScreen(
   viewModel: AuthViewModel,
   onNavigateBack: () -> Unit,
+  onOpenActivation: () -> Unit = {},
   themeMode: AppThemeMode = AppThemeMode.SYSTEM,
   onThemeModeChanged: (AppThemeMode) -> Unit = {},
   modifier: Modifier = Modifier
@@ -528,6 +529,65 @@ fun ProfileScreen(
           currentMode = themeMode,
           onThemeModeSelected = onThemeModeChanged
         )
+      }
+
+      // 5. Offline Activation Settings Card
+      item {
+        Card(
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+          elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenActivation() }
+        ) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+              Box(
+                modifier = Modifier
+                  .size(40.dp)
+                  .clip(CircleShape)
+                  .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Lock,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(20.dp)
+                )
+              }
+              Spacer(modifier = Modifier.width(12.dp))
+              Column {
+                Text(
+                  text = "Mirkaneessa Moobaayilaa (Activation)",
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 14.sp,
+                  color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                  text = "Device ID ilaaluu fi koodii galchuun qormaata hunda bani",
+                  fontSize = 11.sp,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+              }
+            }
+
+            Button(
+              onClick = onOpenActivation,
+              shape = RoundedCornerShape(8.dp),
+              contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+              Text("Banadhu", fontSize = 11.sp)
+            }
+          }
+        }
       }
 
       // 5. Offline Storage Info

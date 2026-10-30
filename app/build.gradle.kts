@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
   alias(libs.plugins.android.application)
@@ -23,9 +25,9 @@ android {
   }
 
   val keystorePropertiesFile = rootProject.file("key.properties")
-  val keystoreProperties = java.util.Properties()
+  val keystoreProperties = Properties()
   if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
